@@ -24,16 +24,7 @@ function updateBarWidth() {
     var barWidth = minBarWidth + calculatedWidth;
     $crashGamesBar.css({
         width: barWidth + '%'
-        
     });
-
-
-
-
-
-
-    
-
 }
 
 function autoplay() {
@@ -76,117 +67,9 @@ $crashGamesSec.on('scroll', function () {
 
 scrollTimer = setInterval(autoplay, 3000);
 
-
-var swiperMobile = new Swiper('.crash__games__mobile', {
-    loop: true,
-    slidesPerView: 'auto',
-    spaceBetween: 10,
-    autoplay: false,
-    pagination: {
-        el: '.swiper-pagination',
-        clickable: true
-    },
-    breakpoints: {
-        640: {
-            slidesPerView: 1,
-            spaceBetween: 20
-        },
-        768: {
-            slidesPerView: 1,
-            spaceBetween: 10
-        },
-        1024: {
-            slidesPerView: 1,
-            spaceBetween: 10
-        }
-    }
-});
-
-
-var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
-    slidesPerView: 4,
-    spaceBetween: 20,
-    mousewheel: {
-        forceToAxis: true,
-        sensitivity: 1,
-        releaseOnEdges: true,
-    },
-    autoplay: false,
-    speed: 500,
-    pagination: {
-        el: ".swiper-pagination",
-        clickable: true,
-    },
-    loop: true,
-});
-
-
-var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
-    slidesPerView: 4,
-    spaceBetween: 20,
-    mousewheel: {
-        forceToAxis: true,
-        sensitivity: 1,
-        releaseOnEdges: true,
-    },
-    autoplay: false,
-    speed: 500,
-    pagination: {
-        el: ".swiper-pagination",
-        clickable: true,
-    },
-    loop: true,
-});
-document.addEventListener('DOMContentLoaded', function () {
-    function setupFallbackDetection(container) {
-        const observer = new MutationObserver(function (mutations) {
-            mutations.forEach(function (mutation) {
-                mutation.removedNodes.forEach(function (node) {
-                    if (node.classList && node.classList.contains('crash__svg__object')) {
-                        const parentLink = mutation.target.closest('.casinoLink, .casinoLinkremoved');
-                        const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
-                        const fallback = mutation.target.querySelector('.svg__fallback');
-                        if (dataImage) {
-                            const testImage = new Image();
-                            testImage.onload = function () {
-                                mutation.target.style.backgroundImage = 'url(' + dataImage + ')';
-                                mutation.target.style.backgroundSize = 'contain';
-                                mutation.target.style.backgroundPosition = 'center';
-                                mutation.target.style.backgroundRepeat = 'no-repeat';
-                                if (fallback) {
-                                    fallback.style.display = 'none';
-                                }
-                            };
-                            testImage.onerror = function () {
-                                if (fallback) {
-                                    fallback.style.display = 'flex';
-                                }
-                                if (parentLink) {
-                                    parentLink.classList.remove('casinoLink');
-                                    parentLink.classList.add('casinoLinkremoved');
-                                }
-                            };
-                            testImage.src = dataImage;
-                        } else {
-                            if (fallback) {
-                                fallback.style.display = 'flex';
-                            }
-                            if (parentLink) {
-                                parentLink.classList.remove('casinoLink');
-                                parentLink.classList.add('casinoLinkremoved');
-                            }
-                        }
-                    }
-                });
-            });
-        });
-        observer.observe(container, {
-            childList: true,
-            subtree: true
-        });
-    }
-    
-    document.querySelectorAll('.svg__object__container').forEach(setupFallbackDetection);
+// Global SVG handler
+var svgHandler = (function() {
+    const processedLinks = new WeakSet();
     
     function isSvgLoaded(svgObject) {
         if (!svgObject) return false;
@@ -196,7 +79,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (svgObject.getSVGDocument && svgObject.getSVGDocument()) return true;
             if (svgObject.complete === true) return true;
             
-            // Check if data attribute exists and object is ready
             const data = svgObject.getAttribute('data');
             if (data && svgObject.offsetWidth > 0 && svgObject.offsetHeight > 0) {
                 return true;
@@ -207,8 +89,6 @@ document.addEventListener('DOMContentLoaded', function () {
         
         return false;
     }
-    
-    const processedLinks = new WeakSet();
     
     function handleSvgElement(link) {
         if (processedLinks.has(link)) return;
@@ -226,11 +106,9 @@ document.addEventListener('DOMContentLoaded', function () {
         let checkInterval;
         let timeoutId;
         
-        // Don't set opacity to 0 initially - let it stay visible
-        // Remove any inline opacity that might be set
-        if (svgObject.style.opacity === '0') {
-            svgObject.style.opacity = '';
-        }
+        // Force opacity to 1 initially
+        svgObject.style.opacity = '1';
+        svgObject.style.display = '';
         
         function showSvg() {
             if (hasLoaded) return;
@@ -301,9 +179,9 @@ document.addEventListener('DOMContentLoaded', function () {
             svgObject.removeEventListener('error', onError);
         });
         
-        // Periodic checking with interval (more reliable than setTimeout chain)
+        // Periodic checking
         let checkCount = 0;
-        const maxChecks = 50; // Check for 5 seconds (50 * 100ms)
+        const maxChecks = 50;
         
         checkInterval = setInterval(function() {
             checkCount++;
@@ -311,15 +189,12 @@ document.addEventListener('DOMContentLoaded', function () {
             if (isSvgLoaded(svgObject)) {
                 showSvg();
             } else if (checkCount >= maxChecks) {
-                // Timeout - show fallback
                 showFallback();
             }
         }, 100);
         
-        // Absolute timeout as backup (8 seconds)
         timeoutId = setTimeout(function() {
             if (!hasLoaded && !hasFailed) {
-                // One final check before giving up
                 if (isSvgLoaded(svgObject)) {
                     showSvg();
                 } else {
@@ -333,14 +208,169 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.casinoLink').forEach(handleSvgElement);
     }
     
-    // Initial processing
-    processAllLinks();
+    return {
+        processAllLinks: processAllLinks,
+        handleSvgElement: handleSvgElement
+    };
+})();
+
+// Initialize Swipers with proper callbacks
+var swiperMobile = new Swiper('.crash__games__mobile', {
+    loop: true,
+    slidesPerView: 'auto',
+    spaceBetween: 10,
+    autoplay: false,
+    pagination: {
+        el: '.swiper-pagination',
+        clickable: true
+    },
+    on: {
+        init: function() {
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 100);
+        },
+        slideChange: function() {
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 50);
+        }
+    },
+    breakpoints: {
+        640: {
+            slidesPerView: 1,
+            spaceBetween: 20
+        },
+        768: {
+            slidesPerView: 1,
+            spaceBetween: 10
+        },
+        1024: {
+            slidesPerView: 1,
+            spaceBetween: 10
+        }
+    }
+});
+
+var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
+    slidesPerView: 4,
+    spaceBetween: 20,
+    mousewheel: {
+        forceToAxis: true,
+        sensitivity: 1,
+        releaseOnEdges: true,
+    },
+    autoplay: false,
+    speed: 500,
+    pagination: {
+        el: ".swiper-pagination",
+        clickable: true,
+    },
+    loop: true,
+    on: {
+        init: function() {
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 100);
+        },
+        slideChange: function() {
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 50);
+        }
+    }
+});
+
+var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
+    slidesPerView: 4,
+    spaceBetween: 20,
+    mousewheel: {
+        forceToAxis: true,
+        sensitivity: 1,
+        releaseOnEdges: true,
+    },
+    autoplay: false,
+    speed: 500,
+    pagination: {
+        el: ".swiper-pagination",
+        clickable: true,
+    },
+    loop: true,
+    on: {
+        init: function() {
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 100);
+        },
+        slideChange: function() {
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 50);
+        }
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    function setupFallbackDetection(container) {
+        const observer = new MutationObserver(function (mutations) {
+            mutations.forEach(function (mutation) {
+                mutation.removedNodes.forEach(function (node) {
+                    if (node.classList && node.classList.contains('crash__svg__object')) {
+                        const parentLink = mutation.target.closest('.casinoLink, .casinoLinkremoved');
+                        const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
+                        const fallback = mutation.target.querySelector('.svg__fallback');
+                        if (dataImage) {
+                            const testImage = new Image();
+                            testImage.onload = function () {
+                                mutation.target.style.backgroundImage = 'url(' + dataImage + ')';
+                                mutation.target.style.backgroundSize = 'contain';
+                                mutation.target.style.backgroundPosition = 'center';
+                                mutation.target.style.backgroundRepeat = 'no-repeat';
+                                if (fallback) {
+                                    fallback.style.display = 'none';
+                                }
+                            };
+                            testImage.onerror = function () {
+                                if (fallback) {
+                                    fallback.style.display = 'flex';
+                                }
+                                if (parentLink) {
+                                    parentLink.classList.remove('casinoLink');
+                                    parentLink.classList.add('casinoLinkremoved');
+                                }
+                            };
+                            testImage.src = dataImage;
+                        } else {
+                            if (fallback) {
+                                fallback.style.display = 'flex';
+                            }
+                            if (parentLink) {
+                                parentLink.classList.remove('casinoLink');
+                                parentLink.classList.add('casinoLinkremoved');
+                            }
+                        }
+                    }
+                });
+            });
+        });
+        observer.observe(container, {
+            childList: true,
+            subtree: true
+        });
+    }
     
-    // Re-check on window load
+    document.querySelectorAll('.svg__object__container').forEach(setupFallbackDetection);
+    
+    // Initial processing
+    svgHandler.processAllLinks();
+    
+    // Re-check on window load and with multiple delays
     window.addEventListener('load', function() {
-        setTimeout(processAllLinks, 100);
-        setTimeout(processAllLinks, 500);
-        setTimeout(processAllLinks, 1000);
+        setTimeout(svgHandler.processAllLinks, 100);
+        setTimeout(svgHandler.processAllLinks, 300);
+        setTimeout(svgHandler.processAllLinks, 500);
+        setTimeout(svgHandler.processAllLinks, 1000);
+        setTimeout(svgHandler.processAllLinks, 2000);
     });
     
     // Autoplay management
@@ -356,11 +386,7 @@ document.addEventListener('DOMContentLoaded', function () {
             skeleton.classList.contains('d-none') ||
             window.getComputedStyle(skeleton).display === 'none') {
             setTimeout(function () {
-                [
-                    typeof swiperTopRow !== 'undefined' ? swiperTopRow : null,
-                    typeof swiperBottomRow !== 'undefined' ? swiperBottomRow : null,
-                    typeof swiperMobile !== 'undefined' ? swiperMobile : null
-                ].forEach(function (swiper) {
+                [swiperTopRow, swiperBottomRow, swiperMobile].forEach(function (swiper) {
                     try {
                         if (swiper && swiper.autoplay && !swiper.autoplay.running) {
                             swiper.autoplay.start();
@@ -416,11 +442,7 @@ document.addEventListener('DOMContentLoaded', function () {
     
     function startAllAutoplay() {
         if (autoplayStarted) return;
-        [
-            typeof swiperTopRow !== 'undefined' ? swiperTopRow : null,
-            typeof swiperBottomRow !== 'undefined' ? swiperBottomRow : null,
-            typeof swiperMobile !== 'undefined' ? swiperMobile : null
-        ].forEach(function (swiper) {
+        [swiperTopRow, swiperBottomRow, swiperMobile].forEach(function (swiper) {
             try {
                 if (swiper && swiper.autoplay) {
                     if (!swiper.autoplay.running) {
@@ -441,7 +463,5 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 });
-console.log('test');
 
-
-
+console.log('testdsdsdsd');
