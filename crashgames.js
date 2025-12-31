@@ -72,10 +72,7 @@ var swiperMobile = new Swiper('.crash__games__mobile', {
     loop: true,
     slidesPerView: 'auto',
     spaceBetween: 10,
-    autoplay: {
-        delay: 4000,
-        disableOnInteraction: false
-    },
+    autoplay: false,
     pagination: {
         el: '.swiper-pagination',
         clickable: true
@@ -105,10 +102,7 @@ var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
         sensitivity: 1,
         releaseOnEdges: true,
     },
-    autoplay: {
-        delay: 4000,
-        disableOnInteraction: false,
-    },
+    autoplay: false,
     speed: 500,
     pagination: {
         el: ".swiper-pagination",
@@ -126,10 +120,7 @@ var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
         sensitivity: 1,
         releaseOnEdges: true,
     },
-    autoplay: {
-        delay: 4000,
-        disableOnInteraction: false,
-    },
+    autoplay: false,
     speed: 500,
     pagination: {
         el: ".swiper-pagination",
@@ -460,6 +451,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
                     const container = node.parentElement;
                     const fallback = container ? container.querySelector('.svg__fallback') : null;
+                    
                     if (dataImage && container) {
                         const testImage = new Image();
                         testImage.onload = function () {
@@ -499,14 +491,93 @@ document.addEventListener('DOMContentLoaded', function () {
         subtree: true
     });
 }
+    
     document.querySelectorAll('.svg__object__container').forEach(setupFallbackDetection);
+    
+    // Initial processing
     svgHandler.processAllLinks();
+    
+    // Re-check on window load with staggered delays
     window.addEventListener('load', function() {
         setTimeout(svgHandler.processAllLinks, 200);
         setTimeout(svgHandler.processAllLinks, 500);
         setTimeout(svgHandler.processAllLinks, 1000);
         setTimeout(svgHandler.processAllLinks, 2000);
     });
+    
+    // Autoplay management
+    let autoplayStarted = false;
+let skeletonObserver = null;
+
+function startAllAutoplay() {
+    if (autoplayStarted) return;
+    [swiperTopRow, swiperBottomRow, swiperMobile].forEach(swiper => {
+        try {
+            if (swiper && swiper.autoplay && !swiper.autoplay.running) {
+                swiper.autoplay.start();
+            }
+        } catch (e) {}
+    });
+    autoplayStarted = true;
+}
+
+function checkAndStartAutoplay() {
+    if (autoplayStarted) return true;
+
+    const skeleton = document.querySelector('.sportsbook_page_skeleton');
+    if (!skeleton ||
+        skeleton.style.display === 'none' ||
+        !skeleton.offsetParent ||
+        skeleton.classList.contains('d-none') ||
+        window.getComputedStyle(skeleton).display === 'none') {
+        setTimeout(startAllAutoplay, 100); // Slight delay for DOM stabilization
+        if (skeletonObserver) {
+            skeletonObserver.disconnect();
+            skeletonObserver = null;
+        }
+        return true;
+    }
+    return false;
+}
+
+// Initial check
+if (!checkAndStartAutoplay()) {
+    const skeleton = document.querySelector('.sportsbook_page_skeleton');
+    if (skeleton) {
+        skeletonObserver = new MutationObserver(() => {
+            if (checkAndStartAutoplay()) {
+                if (skeletonObserver) {
+                    skeletonObserver.disconnect();
+                    skeletonObserver = null;
+                }
+            }
+        });
+
+        skeletonObserver.observe(skeleton, { attributes: true, attributeFilter: ['style', 'class'] });
+        skeletonObserver.observe(document.body, { childList: true, subtree: true });
+
+        // Fallback in case skeleton never disappears properly
+        setTimeout(() => {
+            if (!autoplayStarted) {
+                startAllAutoplay();
+                if (skeletonObserver) {
+                    skeletonObserver.disconnect();
+                    skeletonObserver = null;
+                }
+            }
+        }, 10000);
+    } else {
+        // No skeleton found: start immediately
+        setTimeout(startAllAutoplay, 1000);
+    }
+}
+
+// Resume autoplay on visibility change
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && autoplayStarted) {
+        setTimeout(startAllAutoplay, 300);
+    }
+});
 });
 
-console.log('ajithdkdksdjsdk');
+console.log('test     122222dsdsdsdsd sdsddssds sasasasasas');
