@@ -75,7 +75,7 @@ var svgHandler = (function() {
         if (!svgObject) return false;
         
         try {
-            // Try to access contentDocument - this is the most reliable way
+            // Try to access contentDocument
             const doc = svgObject.contentDocument;
             if (doc) {
                 const svgElement = doc.querySelector('svg');
@@ -92,14 +92,36 @@ var svgHandler = (function() {
                         return true;
                     }
                 } catch (e) {
-                    // Cross-origin or not loaded yet
+                    // CORS blocked - but check if it visually loaded
                 }
             }
         } catch (e) {
-            // Access denied or not ready
+            // CORS or access denied - check alternate indicators
+        }
+        
+        // If we can't access content due to CORS, check visual indicators
+        // If the object has dimensions and data attribute, assume it loaded
+        if (svgObject.offsetWidth > 0 && svgObject.offsetHeight > 0) {
+            const dataUrl = svgObject.getAttribute('data');
+            if (dataUrl && dataUrl.trim() !== '') {
+                // Object is visible with valid data - likely loaded successfully despite CORS
+                return true;
+            }
         }
         
         return false;
+    }
+    
+    function testSvgUrl(url, onSuccess, onError) {
+        // Test if the SVG URL is accessible
+        const testImg = new Image();
+        testImg.onload = function() {
+            onSuccess();
+        };
+        testImg.onerror = function() {
+            onError();
+        };
+        testImg.src = url;
     }
     
     function handleSvgElement(link) {
@@ -130,6 +152,8 @@ var svgHandler = (function() {
         let resolved = false;
         let checkInterval;
         let maxTimeout;
+        let loadEventFired = false;
+        let errorEventFired = false;
         
         function markAsLoaded() {
             if (resolved) return;
@@ -188,13 +212,13 @@ var svgHandler = (function() {
         
         // Listen for successful load
         svgObject.addEventListener('load', function onLoad() {
-            // Give it a moment to render
+            loadEventFired = true;
+            // Wait a bit for rendering
             setTimeout(function() {
-                if (isSvgLoaded(svgObject)) {
+                if (!errorEventFired) {
+                    // Load event fired - consider it successful
+                    // Even if we can't access contentDocument due to CORS
                     markAsLoaded();
-                } else {
-                    // Load event fired but no content - it failed
-                    markAsFailed();
                 }
             }, 100);
             svgObject.removeEventListener('load', onLoad);
@@ -202,37 +226,68 @@ var svgHandler = (function() {
         
         // Listen for error
         svgObject.addEventListener('error', function onError() {
+            errorEventFired = true;
             markAsFailed();
             svgObject.removeEventListener('error', onError);
         }, { once: true });
         
+        // Test the URL accessibility as backup
+        testSvgUrl(svgDataUrl, 
+            function() {
+                // URL is accessible - if load event doesn't fire, still consider checking
+            },
+            function() {
+                // URL returned error - mark as failed
+                if (!loadEventFired && !resolved) {
+                    setTimeout(function() {
+                        if (!loadEventFired && !resolved) {
+                            markAsFailed();
+                        }
+                    }, 1000);
+                }
+            }
+        );
+        
         // Polling mechanism - check every 150ms
         let checkCount = 0;
-        const maxChecks = 40; // 6 seconds total (40 * 150ms)
+        const maxChecks = 30; // 4.5 seconds total (30 * 150ms)
         
         checkInterval = setInterval(function() {
             checkCount++;
             
-            if (isSvgLoaded(svgObject)) {
+            if (errorEventFired) {
+                // Already failed
+                return;
+            }
+            
+            if (loadEventFired || isSvgLoaded(svgObject)) {
                 // Successfully loaded
                 markAsLoaded();
             } else if (checkCount >= maxChecks) {
-                // Timeout reached - consider it failed
-                markAsFailed();
+                // Timeout reached
+                // Check one more time if it has visual dimensions (CORS case)
+                if (svgObject.offsetWidth > 0 && svgObject.offsetHeight > 0) {
+                    // Has dimensions - likely loaded but CORS blocked access
+                    markAsLoaded();
+                } else {
+                    // No dimensions - failed
+                    markAsFailed();
+                }
             }
         }, 150);
         
-        // Absolute maximum timeout (10 seconds)
+        // Absolute maximum timeout (6 seconds)
         maxTimeout = setTimeout(function() {
             if (!resolved) {
-                // One final check
-                if (isSvgLoaded(svgObject)) {
+                // Final check
+                if (loadEventFired || isSvgLoaded(svgObject) || 
+                    (svgObject.offsetWidth > 0 && svgObject.offsetHeight > 0)) {
                     markAsLoaded();
                 } else {
                     markAsFailed();
                 }
             }
-        }, 10000);
+        }, 6000);
     }
     
     function processAllLinks() {
@@ -494,4 +549,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-console.log('test asasasasass');
+console.log('test     dsdsdsdsdsdsd');
