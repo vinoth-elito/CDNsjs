@@ -26,6 +26,14 @@ function updateBarWidth() {
         width: barWidth + '%'
         
     });
+
+
+
+
+
+
+    
+
 }
 
 function autoplay() {
