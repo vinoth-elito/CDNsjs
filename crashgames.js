@@ -446,7 +446,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // Autoplay management
     let autoplayStarted = false;
     let skeletonObserver = null;
-    
     function checkAndStartAutoplay() {
         if (autoplayStarted) return true;
         const skeleton = document.querySelector('.sportsbook_page_skeleton');
@@ -456,7 +455,11 @@ document.addEventListener('DOMContentLoaded', function () {
             skeleton.classList.contains('d-none') ||
             window.getComputedStyle(skeleton).display === 'none') {
             setTimeout(function () {
-                [swiperTopRow, swiperBottomRow, swiperMobile].forEach(function (swiper) {
+                [
+                    typeof swiperTopRow !== 'undefined' ? swiperTopRow : null,
+                    typeof swiperBottomRow !== 'undefined' ? swiperBottomRow : null,
+                    typeof swiperMobile !== 'undefined' ? swiperMobile : null
+                ].forEach(function (swiper) {
                     try {
                         if (swiper && swiper.autoplay && !swiper.autoplay.running) {
                             swiper.autoplay.start();
@@ -509,10 +512,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }, 1000);
         }
     }
-    
     function startAllAutoplay() {
         if (autoplayStarted) return;
-        [swiperTopRow, swiperBottomRow, swiperMobile].forEach(function (swiper) {
+        [
+            typeof swiperTopRow !== 'undefined' ? swiperTopRow : null,
+            typeof swiperBottomRow !== 'undefined' ? swiperBottomRow : null,
+            typeof swiperMobile !== 'undefined' ? swiperMobile : null
+        ].forEach(function (swiper) {
             try {
                 if (swiper && swiper.autoplay) {
                     if (!swiper.autoplay.running) {
@@ -524,6 +530,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         autoplayStarted = true;
     }
+
     
     document.addEventListener('visibilitychange', function () {
         if (!document.hidden && autoplayStarted) {
@@ -534,4 +541,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-console.log('test     122222');
+console.log('test     122222dsdsdsdsd');
