@@ -475,83 +475,116 @@ var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
 });
 
 document.addEventListener('DOMContentLoaded', function () {
+    // Setup mutation observer to detect when object/img is removed
     function setupFallbackDetection(container) {
-        const observer = new MutationObserver(function (mutations) {
-            mutations.forEach(function (mutation) {
-                mutation.removedNodes.forEach(function (node) {
-                    // Handle OBJECT or IMG element removal
-                    if ((node.classList && node.classList.contains('crash__svg__object')) || 
-                        (node.tagName && (node.tagName.toLowerCase() === 'object' || node.tagName.toLowerCase() === 'img'))) {
+        // Create a new observer for each container
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'childList' && mutation.removedNodes.length > 0) {
+                    // Check each removed node
+                    for (let i = 0; i < mutation.removedNodes.length; i++) {
+                        const node = mutation.removedNodes[i];
                         
-                        // Get the container (parent of the removed node)
-                        const container = node.parentElement;
-                        const parentLink = container ? container.closest('.casinoLink, .casinoLinkremoved') : null;
-                        const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
-                        const fallback = container ? container.querySelector('.svg__fallback') : null;
-                        
-                        if (dataImage && container) {
-                            // Test the data-image URL
-                            const testImage = new Image();
-                            testImage.onload = function () {
-                                container.style.backgroundImage = 'url(' + dataImage + ')';
-                                container.style.backgroundSize = 'contain';
-                                container.style.backgroundPosition = 'center';
-                                container.style.backgroundRepeat = 'no-repeat';
-                                if (fallback) {
-                                    fallback.style.display = 'none';
+                        // Check if removed node is an object or img with the crash__svg__object class
+                        if (node.nodeType === 1) { // Element node
+                            const isTargetElement = (
+                                (node.classList && node.classList.contains('crash__svg__object')) ||
+                                (node.tagName && (
+                                    node.tagName.toLowerCase() === 'object' || 
+                                    node.tagName.toLowerCase() === 'img'
+                                ))
+                            );
+                            
+                            if (isTargetElement) {
+                                console.log('Object/IMG removed from container:', node);
+                                
+                                // Get the container (which is the target of the observer)
+                                const container = mutation.target;
+                                const parentLink = container.closest('.casinoLink, .casinoLinkremoved');
+                                const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
+                                const fallback = container.querySelector('.svg__fallback');
+                                
+                                if (dataImage && container) {
+                                    console.log('Trying to load data-image:', dataImage);
+                                    // Test the data-image URL
+                                    const testImage = new Image();
+                                    testImage.onload = function () {
+                                        console.log('Data-image loaded successfully');
+                                        container.style.backgroundImage = 'url(' + dataImage + ')';
+                                        container.style.backgroundSize = 'contain';
+                                        container.style.backgroundPosition = 'center';
+                                        container.style.backgroundRepeat = 'no-repeat';
+                                        if (fallback) {
+                                            fallback.style.display = 'none';
+                                        }
+                                    };
+                                    testImage.onerror = function () {
+                                        console.log('Data-image failed to load');
+                                        if (fallback) {
+                                            fallback.style.display = 'flex';
+                                        }
+                                        if (parentLink) {
+                                            parentLink.classList.remove('casinoLink');
+                                            parentLink.classList.add('casinoLinkremoved');
+                                        }
+                                    };
+                                    testImage.src = dataImage;
+                                } else {
+                                    console.log('No data-image available, showing fallback');
+                                    if (fallback) {
+                                        fallback.style.display = 'flex';
+                                    }
+                                    if (parentLink) {
+                                        parentLink.classList.remove('casinoLink');
+                                        parentLink.classList.add('casinoLinkremoved');
+                                    }
                                 }
-                            };
-                            testImage.onerror = function () {
-                                if (fallback) {
-                                    fallback.style.display = 'flex';
-                                }
-                                if (parentLink) {
-                                    parentLink.classList.remove('casinoLink');
-                                    parentLink.classList.add('casinoLinkremoved');
-                                }
-                            };
-                            testImage.src = dataImage;
-                        } else {
-                            if (fallback) {
-                                fallback.style.display = 'flex';
-                            }
-                            if (parentLink) {
-                                parentLink.classList.remove('casinoLink');
-                                parentLink.classList.add('casinoLinkremoved');
                             }
                         }
-                    }
-                });
-            });
-        });
-        
-        // Observe for child list changes (when object/img is removed)
-        observer.observe(container, {
-            childList: true,
-            subtree: false // Only watch direct children changes
-        });
-    }
-    
-    // Setup fallback detection on all containers
-    document.querySelectorAll('.svg__object__container').forEach(setupFallbackDetection);
-    
-    // Also setup mutation observer on document to catch dynamically added containers
-    const globalObserver = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-            mutation.addedNodes.forEach(function(node) {
-                if (node.nodeType === 1) { // Element node
-                    // Check if added node is a container or contains containers
-                    if (node.classList && node.classList.contains('svg__object__container')) {
-                        setupFallbackDetection(node);
-                    } else {
-                        const containers = node.querySelectorAll ? node.querySelectorAll('.svg__object__container') : [];
-                        containers.forEach(setupFallbackDetection);
                     }
                 }
             });
         });
+        
+        // Start observing the container for child list changes
+        observer.observe(container, {
+            childList: true,
+            subtree: false // Only watch direct children
+        });
+        
+        // Store the observer on the container so we can disconnect it if needed
+        container._fallbackObserver = observer;
+    }
+    
+    // Setup fallback detection on all existing containers
+    document.querySelectorAll('.svg__object__container').forEach(setupFallbackDetection);
+    
+    // Global observer to catch dynamically added containers
+    const globalObserver = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                mutation.addedNodes.forEach(function(node) {
+                    if (node.nodeType === 1) { // Element node
+                        // Check if node is a container
+                        if (node.classList && node.classList.contains('svg__object__container')) {
+                            setupFallbackDetection(node);
+                        }
+                        // Check if node contains containers
+                        if (node.querySelectorAll) {
+                            const containers = node.querySelectorAll('.svg__object__container');
+                            containers.forEach(function(container) {
+                                if (!container._fallbackObserver) {
+                                    setupFallbackDetection(container);
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+        });
     });
     
+    // Start observing the entire document for new containers
     globalObserver.observe(document.body, {
         childList: true,
         subtree: true
@@ -589,6 +622,19 @@ document.addEventListener('DOMContentLoaded', function () {
             setTimeout(ensureAutoplayRunning, 1000);
         }
     });
+    
+    // Cleanup function
+    window.addEventListener('beforeunload', function() {
+        // Disconnect all observers
+        document.querySelectorAll('.svg__object__container').forEach(function(container) {
+            if (container._fallbackObserver) {
+                container._fallbackObserver.disconnect();
+            }
+        });
+        if (globalObserver) {
+            globalObserver.disconnect();
+        }
+    });
 });
 
-console.log('Swiper autoplay ALWAYS enabled with correct OBJECT/IMG handlingsasasas');
+console.log('Swiper autoplay ALWAYS enabled with correct OBJECT/IMG handling sasaasas');
