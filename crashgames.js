@@ -24,6 +24,7 @@ function updateBarWidth() {
     var barWidth = minBarWidth + calculatedWidth;
     $crashGamesBar.css({
         width: barWidth + '%'
+        
     });
 }
 
