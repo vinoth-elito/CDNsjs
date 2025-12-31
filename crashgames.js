@@ -72,7 +72,10 @@ var swiperMobile = new Swiper('.crash__games__mobile', {
     loop: true,
     slidesPerView: 'auto',
     spaceBetween: 10,
-    autoplay: false,
+    autoplay: {
+        delay: 4000,
+        disableOnInteraction: false
+    },
     pagination: {
         el: '.swiper-pagination',
         clickable: true
@@ -102,7 +105,10 @@ var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
         sensitivity: 1,
         releaseOnEdges: true,
     },
-    autoplay: false,
+    autoplay: {
+        delay: 4000,
+        disableOnInteraction: false,
+    },
     speed: 500,
     pagination: {
         el: ".swiper-pagination",
@@ -120,7 +126,10 @@ var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
         sensitivity: 1,
         releaseOnEdges: true,
     },
-    autoplay: false,
+    autoplay: {
+        delay: 4000,
+        disableOnInteraction: false,
+    },
     speed: 500,
     pagination: {
         el: ".swiper-pagination",
@@ -128,186 +137,6 @@ var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
     },
     loop: true,
 });
-
-// Global SVG handler
-// Enhanced handler for both SVG and IMG elements
-var svgHandler = (function() {
-    const processedLinks = new WeakSet();
-    const processedImages = new WeakSet();
-    
-    function isSvgLoaded(svgObject) {
-        // ... keep your existing isSvgLoaded function unchanged ...
-    }
-    
-    function handleImageElement(imgElement, link) {
-        if (processedImages.has(imgElement)) return;
-        processedImages.add(imgElement);
-        
-        const container = imgElement.closest('.svg__object__container');
-        const fallback = container ? container.querySelector('.svg__fallback') : null;
-        const dataImage = link ? link.getAttribute('data-image') : null;
-        
-        let resolved = false;
-        
-        function markAsLoaded() {
-            if (resolved) return;
-            resolved = true;
-            
-            imgElement.style.opacity = '1';
-            imgElement.style.display = '';
-            
-            // Remove any background from container
-            if (container) {
-                container.style.backgroundImage = 'none';
-            }
-            
-            // Hide fallback
-            if (fallback) {
-                fallback.style.display = 'none';
-            }
-        }
-        
-        function markAsFailed() {
-            if (resolved) return;
-            resolved = true;
-            
-            imgElement.style.opacity = '0';
-            imgElement.style.display = 'none';
-            
-            // Try to use data-image as fallback
-            if (dataImage && container) {
-                const testImage = new Image();
-                testImage.onload = function() {
-                    container.style.backgroundImage = 'url(' + dataImage + ')';
-                    container.style.backgroundSize = 'contain';
-                    container.style.backgroundPosition = 'center';
-                    container.style.backgroundRepeat = 'no-repeat';
-                    
-                    if (fallback) {
-                        fallback.style.display = 'none';
-                    }
-                };
-                testImage.onerror = function() {
-                    // Both img and data-image failed - show fallback
-                    if (fallback) {
-                        fallback.style.display = 'flex';
-                    }
-                    if (link) {
-                        link.classList.remove('casinoLink');
-                        link.classList.add('casinoLinkremoved');
-                    }
-                };
-                testImage.src = dataImage;
-            } else {
-                // No data-image available - show fallback
-                if (fallback) {
-                    fallback.style.display = 'flex';
-                }
-                if (link) {
-                    link.classList.remove('casinoLink');
-                    link.classList.add('casinoLinkremoved');
-                }
-            }
-        }
-        
-        // Check if image already loaded
-        if (imgElement.complete) {
-            if (imgElement.naturalHeight > 0 && imgElement.naturalWidth > 0) {
-                // Image already loaded successfully
-                markAsLoaded();
-            } else {
-                // Image already failed
-                markAsFailed();
-            }
-        } else {
-            // Image hasn't loaded yet
-            imgElement.style.opacity = '0';
-            
-            // Set up load/error listeners
-            imgElement.addEventListener('load', function onLoad() {
-                markAsLoaded();
-                imgElement.removeEventListener('load', onLoad);
-            }, { once: true });
-            
-            imgElement.addEventListener('error', function onError() {
-                markAsFailed();
-                imgElement.removeEventListener('error', onError);
-            }, { once: true });
-            
-            // Set timeout in case events don't fire
-            setTimeout(function() {
-                if (!resolved) {
-                    if (imgElement.complete) {
-                        if (imgElement.naturalHeight > 0 && imgElement.naturalWidth > 0) {
-                            markAsLoaded();
-                        } else {
-                            markAsFailed();
-                        }
-                    } else {
-                        // Still loading after timeout, consider failed
-                        markAsFailed();
-                    }
-                }
-            }, 5000); // 5 second timeout
-        }
-    }
-    
-    function handleSvgElement(link) {
-        if (processedLinks.has(link)) return;
-        processedLinks.add(link);
-        
-        const dataImage = link.getAttribute('data-image');
-        const container = link.querySelector('.svg__object__container');
-        const svgObject = link.querySelector('.crash__svg__object');
-        const imgElement = link.querySelector('img'); // Check for img elements
-        const fallback = link.querySelector('.svg__fallback');
-        
-        // Handle img element if present (priority)
-        if (imgElement) {
-            handleImageElement(imgElement, link);
-            return;
-        }
-        
-        // Original SVG handling code (keep your existing code)
-        if (!container || !svgObject) return;
-        
-        const svgDataUrl = svgObject.getAttribute('data');
-        
-        // If no data URL at all, show fallback immediately
-        if (!svgDataUrl || svgDataUrl.trim() === '') {
-            svgObject.style.opacity = '0';
-            svgObject.style.display = 'none';
-            if (fallback) {
-                fallback.style.display = 'flex';
-            }
-            link.classList.remove('casinoLink');
-            link.classList.add('casinoLinkremoved');
-            return;
-        }
-        
-        // ... rest of your existing handleSvgElement code ...
-    }
-    
-    function processAllLinks() {
-        // Process all casino links (for SVG)
-        document.querySelectorAll('.casinoLink').forEach(handleSvgElement);
-        
-        // Also process any img elements that might not be in .casinoLink containers
-        document.querySelectorAll('.svg__object__container img').forEach(function(img) {
-            if (!processedImages.has(img)) {
-                const link = img.closest('.casinoLink, .casinoLinkremoved');
-                handleImageElement(img, link);
-            }
-        });
-    }
-    
-    return {
-        processAllLinks: processAllLinks,
-        handleSvgElement: handleSvgElement
-    };
-})();
-
-// Initialize Swipers with proper callbacks
 var swiperMobile = new Swiper('.crash__games__mobile', {
     loop: true,
     slidesPerView: 'auto',
@@ -344,7 +173,6 @@ var swiperMobile = new Swiper('.crash__games__mobile', {
         }
     }
 });
-
 var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
     slidesPerView: 4,
     spaceBetween: 20,
@@ -373,7 +201,6 @@ var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
         }
     }
 });
-
 var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
     slidesPerView: 4,
     spaceBetween: 20,
@@ -402,13 +229,11 @@ var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
         }
     }
 });
-
 document.addEventListener('DOMContentLoaded', function () {
     function setupFallbackDetection(container) {
     const observer = new MutationObserver(function (mutations) {
         mutations.forEach(function (mutation) {
             mutation.removedNodes.forEach(function (node) {
-                // Handle SVG object removal
                 if (node.classList && node.classList.contains('crash__svg__object')) {
                     const parentLink = mutation.target.closest('.casinoLink, .casinoLinkremoved');
                     const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
@@ -444,14 +269,11 @@ document.addEventListener('DOMContentLoaded', function () {
                         }
                     }
                 }
-                
-                // Handle IMG element removal
                 if (node.tagName && node.tagName.toLowerCase() === 'img') {
                     const parentLink = node.closest('.casinoLink, .casinoLinkremoved');
                     const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
                     const container = node.parentElement;
                     const fallback = container ? container.querySelector('.svg__fallback') : null;
-                    
                     if (dataImage && container) {
                         const testImage = new Image();
                         testImage.onload = function () {
@@ -491,93 +313,14 @@ document.addEventListener('DOMContentLoaded', function () {
         subtree: true
     });
 }
-    
     document.querySelectorAll('.svg__object__container').forEach(setupFallbackDetection);
-    
-    // Initial processing
     svgHandler.processAllLinks();
-    
-    // Re-check on window load with staggered delays
     window.addEventListener('load', function() {
         setTimeout(svgHandler.processAllLinks, 200);
         setTimeout(svgHandler.processAllLinks, 500);
         setTimeout(svgHandler.processAllLinks, 1000);
         setTimeout(svgHandler.processAllLinks, 2000);
     });
-    
-    // Autoplay management
-    let autoplayStarted = false;
-let skeletonObserver = null;
-
-function startAllAutoplay() {
-    if (autoplayStarted) return;
-    [swiperTopRow, swiperBottomRow, swiperMobile].forEach(swiper => {
-        try {
-            if (swiper && swiper.autoplay && !swiper.autoplay.running) {
-                swiper.autoplay.start();
-            }
-        } catch (e) {}
-    });
-    autoplayStarted = true;
-}
-
-function checkAndStartAutoplay() {
-    if (autoplayStarted) return true;
-
-    const skeleton = document.querySelector('.sportsbook_page_skeleton');
-    if (!skeleton ||
-        skeleton.style.display === 'none' ||
-        !skeleton.offsetParent ||
-        skeleton.classList.contains('d-none') ||
-        window.getComputedStyle(skeleton).display === 'none') {
-        setTimeout(startAllAutoplay, 100); // Slight delay for DOM stabilization
-        if (skeletonObserver) {
-            skeletonObserver.disconnect();
-            skeletonObserver = null;
-        }
-        return true;
-    }
-    return false;
-}
-
-// Initial check
-if (!checkAndStartAutoplay()) {
-    const skeleton = document.querySelector('.sportsbook_page_skeleton');
-    if (skeleton) {
-        skeletonObserver = new MutationObserver(() => {
-            if (checkAndStartAutoplay()) {
-                if (skeletonObserver) {
-                    skeletonObserver.disconnect();
-                    skeletonObserver = null;
-                }
-            }
-        });
-
-        skeletonObserver.observe(skeleton, { attributes: true, attributeFilter: ['style', 'class'] });
-        skeletonObserver.observe(document.body, { childList: true, subtree: true });
-
-        // Fallback in case skeleton never disappears properly
-        setTimeout(() => {
-            if (!autoplayStarted) {
-                startAllAutoplay();
-                if (skeletonObserver) {
-                    skeletonObserver.disconnect();
-                    skeletonObserver = null;
-                }
-            }
-        }, 10000);
-    } else {
-        // No skeleton found: start immediately
-        setTimeout(startAllAutoplay, 1000);
-    }
-}
-
-// Resume autoplay on visibility change
-document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && autoplayStarted) {
-        setTimeout(startAllAutoplay, 300);
-    }
-});
 });
 
-console.log('test     122222dsdsdsdsd sdsddssds sasasasasas');
+console.log('vcvcvcv');
