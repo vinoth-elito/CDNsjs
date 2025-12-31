@@ -100,13 +100,9 @@ var svgHandler = (function() {
                 // CORS or access denied
             }
             
-            // Check visual indicators
-            if (element.offsetWidth > 0 && element.offsetHeight > 0) {
-                const dataUrl = element.getAttribute('data');
-                if (dataUrl && dataUrl.trim() !== '') {
-                    return true;
-                }
-            }
+            // Check visual indicators - for OBJECT with wrong path, offset might still be > 0
+            // So we need more reliable checks
+            return false;
         }
         
         // Handle IMG elements
@@ -199,16 +195,7 @@ var svgHandler = (function() {
             }
         }
         
-        // Check if already loaded
-        if (isSvgLoaded(element)) {
-            markAsLoaded();
-            return;
-        }
-        
-        // Element hasn't loaded yet
-        element.style.opacity = '0';
-        
-        // Get the URL to test
+        // Get the URL
         let mediaUrl = '';
         if (isObject) {
             mediaUrl = element.getAttribute('data');
@@ -224,61 +211,83 @@ var svgHandler = (function() {
             return;
         }
         
-        // Test URL accessibility
+        // Test URL accessibility FIRST - before setting up any listeners
         testUrl(mediaUrl, 
             function() {
-                // URL is accessible
-            },
-            function() {
-                // URL returned error - mark as failed after timeout
+                // URL is accessible - wait for load event
+                element.style.opacity = '0';
+                
+                // Set up load/error listeners
+                element.addEventListener('load', function onLoad() {
+                    // For OBJECT elements, check if content actually loaded
+                    if (isObject) {
+                        // Wait and check if contentDocument is available
+                        setTimeout(function() {
+                            if (isSvgLoaded(element)) {
+                                markAsLoaded();
+                            } else {
+                                // OBJECT loaded but no SVG content - treat as failed
+                                markAsFailed();
+                            }
+                        }, 300);
+                    } else {
+                        // For IMG elements
+                        setTimeout(function() {
+                            markAsLoaded();
+                        }, 100);
+                    }
+                    element.removeEventListener('load', onLoad);
+                }, { once: true });
+                
+                element.addEventListener('error', function onError() {
+                    markAsFailed();
+                    element.removeEventListener('error', onError);
+                }, { once: true });
+                
+                // Special handling for OBJECT with wrong paths
+                if (isObject) {
+                    // Check periodically if content loaded
+                    const checkObjectLoad = setInterval(function() {
+                        if (isSvgLoaded(element)) {
+                            clearInterval(checkObjectLoad);
+                            markAsLoaded();
+                        }
+                    }, 200);
+                    
+                    // If object doesn't load properly within timeout, mark as failed
+                    setTimeout(function() {
+                        clearInterval(checkObjectLoad);
+                        if (!resolved) {
+                            // Check one more time
+                            if (isSvgLoaded(element)) {
+                                markAsLoaded();
+                            } else {
+                                // OBJECT with wrong path often doesn't trigger error event
+                                // but also doesn't load content - treat as failed
+                                markAsFailed();
+                            }
+                        }
+                    }, 5000);
+                }
+                
+                // Overall timeout
                 setTimeout(function() {
                     if (!resolved) {
-                        markAsFailed();
+                        if (isSvgLoaded(element)) {
+                            markAsLoaded();
+                        } else {
+                            markAsFailed();
+                        }
                     }
-                }, 1000);
+                }, 6000);
+            },
+            function() {
+                // URL returned error - mark as failed immediately
+                setTimeout(function() {
+                    markAsFailed();
+                }, 100);
             }
         );
-        
-        // Set up load/error listeners
-        element.addEventListener('load', function onLoad() {
-            // Wait a bit for rendering
-            setTimeout(function() {
-                markAsLoaded();
-            }, 100);
-            element.removeEventListener('load', onLoad);
-        }, { once: true });
-        
-        element.addEventListener('error', function onError() {
-            markAsFailed();
-            element.removeEventListener('error', onError);
-        }, { once: true });
-        
-        // For OBJECT elements, also listen for load event on contentDocument
-        if (isObject) {
-            // Additional check for object contentDocument
-            const checkObjectLoad = setInterval(function() {
-                if (isSvgLoaded(element)) {
-                    clearInterval(checkObjectLoad);
-                    markAsLoaded();
-                }
-            }, 100);
-            
-            // Clear interval after timeout
-            setTimeout(function() {
-                clearInterval(checkObjectLoad);
-            }, 5000);
-        }
-        
-        // Set timeout in case events don't fire
-        setTimeout(function() {
-            if (!resolved) {
-                if (isSvgLoaded(element)) {
-                    markAsLoaded();
-                } else {
-                    markAsFailed();
-                }
-            }
-        }, 5000);
     }
     
     function handleSvgElement(link) {
@@ -545,4 +554,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-console.log('Swiper autoplay ALWAYS enabled with OBJECT/IMG support sasas');
+console.log('Swiper autoplay ALWAYS enabled with OBJECT/IMG support sassasasasasasasasassasas');
