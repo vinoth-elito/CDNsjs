@@ -67,68 +67,7 @@ $crashGamesSec.on('scroll', function () {
 
 scrollTimer = setInterval(autoplay, 3000);
 
-
-var swiperMobile = new Swiper('.crash__games__mobile', {
-    loop: true,
-    slidesPerView: 'auto',
-    spaceBetween: 10,
-    autoplay: false,
-    pagination: {
-        el: '.swiper-pagination',
-        clickable: true
-    },
-    breakpoints: {
-        640: {
-            slidesPerView: 1,
-            spaceBetween: 20
-        },
-        768: {
-            slidesPerView: 1,
-            spaceBetween: 10
-        },
-        1024: {
-            slidesPerView: 1,
-            spaceBetween: 10
-        }
-    }
-});
-
-
-var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
-    slidesPerView: 4,
-    spaceBetween: 20,
-    mousewheel: {
-        forceToAxis: true,
-        sensitivity: 1,
-        releaseOnEdges: true,
-    },
-    autoplay: false,
-    speed: 500,
-    pagination: {
-        el: ".swiper-pagination",
-        clickable: true,
-    },
-    loop: true,
-});
-
-
-var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
-    slidesPerView: 4,
-    spaceBetween: 20,
-    mousewheel: {
-        forceToAxis: true,
-        sensitivity: 1,
-        releaseOnEdges: true,
-    },
-    autoplay: false,
-    speed: 500,
-    pagination: {
-        el: ".swiper-pagination",
-        clickable: true,
-    },
-    loop: true,
-});
-
+// Global SVG handler
 var svgHandler = (function() {
     const processedLinks = new WeakSet();
     const processedImages = new WeakSet();
@@ -492,7 +431,7 @@ var svgHandler = (function() {
     };
 })();
 
-// Initialize Swipers with proper callbacks
+// Initialize Swipers with autoplay enabled by default
 var swiperMobile = new Swiper('.crash__games__mobile', {
     loop: true,
     slidesPerView: 'auto',
@@ -605,26 +544,36 @@ var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
 
 document.addEventListener('DOMContentLoaded', function () {
     function setupFallbackDetection(container) {
-    const observer = new MutationObserver(function (mutations) {
-        mutations.forEach(function (mutation) {
-            mutation.removedNodes.forEach(function (node) {
-                // Handle SVG object removal
-                if (node.classList && node.classList.contains('crash__svg__object')) {
-                    const parentLink = mutation.target.closest('.casinoLink, .casinoLinkremoved');
-                    const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
-                    const fallback = mutation.target.querySelector('.svg__fallback');
-                    if (dataImage) {
-                        const testImage = new Image();
-                        testImage.onload = function () {
-                            mutation.target.style.backgroundImage = 'url(' + dataImage + ')';
-                            mutation.target.style.backgroundSize = 'contain';
-                            mutation.target.style.backgroundPosition = 'center';
-                            mutation.target.style.backgroundRepeat = 'no-repeat';
-                            if (fallback) {
-                                fallback.style.display = 'none';
-                            }
-                        };
-                        testImage.onerror = function () {
+        const observer = new MutationObserver(function (mutations) {
+            mutations.forEach(function (mutation) {
+                mutation.removedNodes.forEach(function (node) {
+                    // Handle SVG object removal
+                    if (node.classList && node.classList.contains('crash__svg__object')) {
+                        const parentLink = mutation.target.closest('.casinoLink, .casinoLinkremoved');
+                        const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
+                        const fallback = mutation.target.querySelector('.svg__fallback');
+                        if (dataImage) {
+                            const testImage = new Image();
+                            testImage.onload = function () {
+                                mutation.target.style.backgroundImage = 'url(' + dataImage + ')';
+                                mutation.target.style.backgroundSize = 'contain';
+                                mutation.target.style.backgroundPosition = 'center';
+                                mutation.target.style.backgroundRepeat = 'no-repeat';
+                                if (fallback) {
+                                    fallback.style.display = 'none';
+                                }
+                            };
+                            testImage.onerror = function () {
+                                if (fallback) {
+                                    fallback.style.display = 'flex';
+                                }
+                                if (parentLink) {
+                                    parentLink.classList.remove('casinoLink');
+                                    parentLink.classList.add('casinoLinkremoved');
+                                }
+                            };
+                            testImage.src = dataImage;
+                        } else {
                             if (fallback) {
                                 fallback.style.display = 'flex';
                             }
@@ -632,38 +581,38 @@ document.addEventListener('DOMContentLoaded', function () {
                                 parentLink.classList.remove('casinoLink');
                                 parentLink.classList.add('casinoLinkremoved');
                             }
-                        };
-                        testImage.src = dataImage;
-                    } else {
-                        if (fallback) {
-                            fallback.style.display = 'flex';
-                        }
-                        if (parentLink) {
-                            parentLink.classList.remove('casinoLink');
-                            parentLink.classList.add('casinoLinkremoved');
                         }
                     }
-                }
-                
-                // Handle IMG element removal
-                if (node.tagName && node.tagName.toLowerCase() === 'img') {
-                    const parentLink = node.closest('.casinoLink, .casinoLinkremoved');
-                    const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
-                    const container = node.parentElement;
-                    const fallback = container ? container.querySelector('.svg__fallback') : null;
                     
-                    if (dataImage && container) {
-                        const testImage = new Image();
-                        testImage.onload = function () {
-                            container.style.backgroundImage = 'url(' + dataImage + ')';
-                            container.style.backgroundSize = 'contain';
-                            container.style.backgroundPosition = 'center';
-                            container.style.backgroundRepeat = 'no-repeat';
-                            if (fallback) {
-                                fallback.style.display = 'none';
-                            }
-                        };
-                        testImage.onerror = function () {
+                    // Handle IMG element removal
+                    if (node.tagName && node.tagName.toLowerCase() === 'img') {
+                        const parentLink = node.closest('.casinoLink, .casinoLinkremoved');
+                        const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
+                        const container = node.parentElement;
+                        const fallback = container ? container.querySelector('.svg__fallback') : null;
+                        
+                        if (dataImage && container) {
+                            const testImage = new Image();
+                            testImage.onload = function () {
+                                container.style.backgroundImage = 'url(' + dataImage + ')';
+                                container.style.backgroundSize = 'contain';
+                                container.style.backgroundPosition = 'center';
+                                container.style.backgroundRepeat = 'no-repeat';
+                                if (fallback) {
+                                    fallback.style.display = 'none';
+                                }
+                            };
+                            testImage.onerror = function () {
+                                if (fallback) {
+                                    fallback.style.display = 'flex';
+                                }
+                                if (parentLink) {
+                                    parentLink.classList.remove('casinoLink');
+                                    parentLink.classList.add('casinoLinkremoved');
+                                }
+                            };
+                            testImage.src = dataImage;
+                        } else {
                             if (fallback) {
                                 fallback.style.display = 'flex';
                             }
@@ -671,26 +620,16 @@ document.addEventListener('DOMContentLoaded', function () {
                                 parentLink.classList.remove('casinoLink');
                                 parentLink.classList.add('casinoLinkremoved');
                             }
-                        };
-                        testImage.src = dataImage;
-                    } else {
-                        if (fallback) {
-                            fallback.style.display = 'flex';
-                        }
-                        if (parentLink) {
-                            parentLink.classList.remove('casinoLink');
-                            parentLink.classList.add('casinoLinkremoved');
                         }
                     }
-                }
+                });
             });
         });
-    });
-    observer.observe(container, {
-        childList: true,
-        subtree: true
-    });
-}
+        observer.observe(container, {
+            childList: true,
+            subtree: true
+        });
+    }
     
     document.querySelectorAll('.svg__object__container').forEach(setupFallbackDetection);
     
@@ -705,79 +644,7 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(svgHandler.processAllLinks, 2000);
     });
     
-    // Autoplay management
-    let autoplayStarted = false;
-let skeletonObserver = null;
-
-function startAllAutoplay() {
-    if (autoplayStarted) return;
-    [swiperTopRow, swiperBottomRow, swiperMobile].forEach(swiper => {
-        try {
-            if (swiper && swiper.autoplay && !swiper.autoplay.running) {
-                swiper.autoplay.start();
-            }
-        } catch (e) {}
-    });
-    autoplayStarted = true;
-}
-
-function checkAndStartAutoplay() {
-    if (autoplayStarted) return true;
-
-    const skeleton = document.querySelector('.sportsbook_page_skeleton');
-    if (!skeleton ||
-        skeleton.style.display === 'none' ||
-        !skeleton.offsetParent ||
-        skeleton.classList.contains('d-none') ||
-        window.getComputedStyle(skeleton).display === 'none') {
-        setTimeout(startAllAutoplay, 100); // Slight delay for DOM stabilization
-        if (skeletonObserver) {
-            skeletonObserver.disconnect();
-            skeletonObserver = null;
-        }
-        return true;
-    }
-    return false;
-}
-
-// Initial check
-if (!checkAndStartAutoplay()) {
-    const skeleton = document.querySelector('.sportsbook_page_skeleton');
-    if (skeleton) {
-        skeletonObserver = new MutationObserver(() => {
-            if (checkAndStartAutoplay()) {
-                if (skeletonObserver) {
-                    skeletonObserver.disconnect();
-                    skeletonObserver = null;
-                }
-            }
-        });
-
-        skeletonObserver.observe(skeleton, { attributes: true, attributeFilter: ['style', 'class'] });
-        skeletonObserver.observe(document.body, { childList: true, subtree: true });
-
-        // Fallback in case skeleton never disappears properly
-        setTimeout(() => {
-            if (!autoplayStarted) {
-                startAllAutoplay();
-                if (skeletonObserver) {
-                    skeletonObserver.disconnect();
-                    skeletonObserver = null;
-                }
-            }
-        }, 10000);
-    } else {
-        // No skeleton found: start immediately
-        setTimeout(startAllAutoplay, 1000);
-    }
-}
-
-// Resume autoplay on visibility change
-document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && autoplayStarted) {
-        setTimeout(startAllAutoplay, 300);
-    }
-});
+    // Handle page visibility changes to pause/resume autoplay
 });
 
-console.log('saasasasxxx');
+console.log('Swiper autoplay enabled by default');
