@@ -431,7 +431,7 @@ var svgHandler = (function() {
     };
 })();
 
-// Initialize Swipers with autoplay enabled by default
+// Initialize Swipers with autoplay ALWAYS enabled
 var swiperMobile = new Swiper('.crash__games__mobile', {
     loop: true,
     slidesPerView: 'auto',
@@ -439,14 +439,30 @@ var swiperMobile = new Swiper('.crash__games__mobile', {
     autoplay: {
         delay: 3000,
         disableOnInteraction: false,
-        pauseOnMouseEnter: true,
-        waitForTransition: true
+        pauseOnMouseEnter: false, // Changed to false - autoplay continues even on hover
+        waitForTransition: true,
+        stopOnLastSlide: false // Changed to false - continues even at last slide
     },
     pagination: {
         el: '.swiper-pagination',
         clickable: true
     },
-
+    on: {
+        init: function() {
+            // Force start autoplay immediately
+            if (this.autoplay && !this.autoplay.running) {
+                this.autoplay.start();
+            }
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 150);
+        },
+        slideChange: function() {
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 100);
+        }
+    },
     breakpoints: {
         640: {
             slidesPerView: 1,
@@ -474,15 +490,32 @@ var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
     autoplay: {
         delay: 3000,
         disableOnInteraction: false,
-        pauseOnMouseEnter: true,
-        waitForTransition: true
+        pauseOnMouseEnter: false, // Changed to false - autoplay continues even on hover
+        waitForTransition: true,
+        stopOnLastSlide: false // Changed to false - continues even at last slide
     },
     speed: 500,
     pagination: {
         el: ".swiper-pagination",
         clickable: true,
     },
-    loop: true
+    loop: true,
+    on: {
+        init: function() {
+            // Force start autoplay immediately
+            if (this.autoplay && !this.autoplay.running) {
+                this.autoplay.start();
+            }
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 150);
+        },
+        slideChange: function() {
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 100);
+        }
+    }
 });
 
 var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
@@ -496,15 +529,32 @@ var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
     autoplay: {
         delay: 3000,
         disableOnInteraction: false,
-        pauseOnMouseEnter: true,
-        waitForTransition: true
+        pauseOnMouseEnter: false, // Changed to false - autoplay continues even on hover
+        waitForTransition: true,
+        stopOnLastSlide: false // Changed to false - continues even at last slide
     },
     speed: 500,
     pagination: {
         el: ".swiper-pagination",
         clickable: true,
     },
-    loop: true
+    loop: true,
+    on: {
+        init: function() {
+            // Force start autoplay immediately
+            if (this.autoplay && !this.autoplay.running) {
+                this.autoplay.start();
+            }
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 150);
+        },
+        slideChange: function() {
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 100);
+        }
+    }
 });
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -609,7 +659,26 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(svgHandler.processAllLinks, 2000);
     });
     
-    // Handle page visibility changes to pause/resume autoplay
+    // Function to restart autoplay if it stops
+    function ensureAutoplayRunning() {
+        [swiperMobile, swiperTopRow, swiperBottomRow].forEach(function(swiper) {
+            if (swiper && swiper.autoplay && !swiper.autoplay.running) {
+                console.log('Restarting autoplay for swiper');
+                swiper.autoplay.start();
+            }
+        });
+    }
+    
+    // Periodically check and restart autoplay if it stops
+    setInterval(ensureAutoplayRunning, 10000); // Check every 10 seconds
+    
+    // Also check when page becomes visible
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            // Page is visible again, ensure autoplay is running
+            setTimeout(ensureAutoplayRunning, 1000);
+        }
+    });
 });
 
-console.log('Swiper autoplay enabled by default');
+console.log('Swiper autoplay ALWAYS enabledasas');
