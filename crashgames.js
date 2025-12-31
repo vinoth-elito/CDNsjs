@@ -216,30 +216,28 @@ var svgHandler = (function() {
             mediaUrl = element.getAttribute('src');
         }
         
-        // Test URL accessibility
-        if (mediaUrl && mediaUrl.trim() !== '') {
-            testUrl(mediaUrl, 
-                function() {
-                    // URL is accessible
-                },
-                function() {
-                    // URL returned error - mark as failed after timeout
-                    setTimeout(function() {
-                        if (!resolved) {
-                            markAsFailed();
-                        }
-                    }, 1000);
-                }
-            );
-        } else {
-            // No URL at all - mark as failed
+        // If no data URL at all, show fallback immediately
+        if (!mediaUrl || mediaUrl.trim() === '') {
             setTimeout(function() {
-                if (!resolved) {
-                    markAsFailed();
-                }
+                markAsFailed();
             }, 100);
             return;
         }
+        
+        // Test URL accessibility
+        testUrl(mediaUrl, 
+            function() {
+                // URL is accessible
+            },
+            function() {
+                // URL returned error - mark as failed after timeout
+                setTimeout(function() {
+                    if (!resolved) {
+                        markAsFailed();
+                    }
+                }, 1000);
+            }
+        );
         
         // Set up load/error listeners
         element.addEventListener('load', function onLoad() {
@@ -547,4 +545,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-console.log('Swiper autoplay ALWAYS enabled with OBJECT/IMG support');
+console.log('Swiper autoplay ALWAYS enabled with OBJECT/IMG support sasas');
