@@ -507,100 +507,77 @@ document.addEventListener('DOMContentLoaded', function () {
     
     // Autoplay management
     let autoplayStarted = false;
-    let skeletonObserver = null;
-    function checkAndStartAutoplay() {
-        if (autoplayStarted) return true;
-        const skeleton = document.querySelector('.sportsbook_page_skeleton');
-        if (!skeleton ||
-            skeleton.style.display === 'none' ||
-            !skeleton.offsetParent ||
-            skeleton.classList.contains('d-none') ||
-            window.getComputedStyle(skeleton).display === 'none') {
-            setTimeout(function () {
-                [
-                    typeof swiperTopRow !== 'undefined' ? swiperTopRow : null,
-                    typeof swiperBottomRow !== 'undefined' ? swiperBottomRow : null,
-                    typeof swiperMobile !== 'undefined' ? swiperMobile : null
-                ].forEach(function (swiper) {
-                    try {
-                        if (swiper && swiper.autoplay && !swiper.autoplay.running) {
-                            swiper.autoplay.start();
-                        }
-                    } catch (e) {
-                    }
-                });
-                autoplayStarted = true;
+let skeletonObserver = null;
+
+function startAllAutoplay() {
+    if (autoplayStarted) return;
+    [swiperTopRow, swiperBottomRow, swiperMobile].forEach(swiper => {
+        try {
+            if (swiper && swiper.autoplay && !swiper.autoplay.running) {
+                swiper.autoplay.start();
+            }
+        } catch (e) {}
+    });
+    autoplayStarted = true;
+}
+
+function checkAndStartAutoplay() {
+    if (autoplayStarted) return true;
+
+    const skeleton = document.querySelector('.sportsbook_page_skeleton');
+    if (!skeleton ||
+        skeleton.style.display === 'none' ||
+        !skeleton.offsetParent ||
+        skeleton.classList.contains('d-none') ||
+        window.getComputedStyle(skeleton).display === 'none') {
+        setTimeout(startAllAutoplay, 100); // Slight delay for DOM stabilization
+        if (skeletonObserver) {
+            skeletonObserver.disconnect();
+            skeletonObserver = null;
+        }
+        return true;
+    }
+    return false;
+}
+
+// Initial check
+if (!checkAndStartAutoplay()) {
+    const skeleton = document.querySelector('.sportsbook_page_skeleton');
+    if (skeleton) {
+        skeletonObserver = new MutationObserver(() => {
+            if (checkAndStartAutoplay()) {
                 if (skeletonObserver) {
                     skeletonObserver.disconnect();
                     skeletonObserver = null;
                 }
-            }, 100);
-            return true;
-        }
-        return false;
-    }
-    
-    if (!checkAndStartAutoplay()) {
-        const skeleton = document.querySelector('.sportsbook_page_skeleton');
-        if (skeleton) {
-            skeletonObserver = new MutationObserver(function (mutations) {
-                if (checkAndStartAutoplay()) {
-                    skeletonObserver.disconnect();
-                    skeletonObserver = null;
-                }
-            });
-            skeletonObserver.observe(skeleton, {
-                attributes: true,
-                attributeFilter: ['style', 'class']
-            });
-            skeletonObserver.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
-            setTimeout(() => {
-                if (skeletonObserver) {
-                    skeletonObserver.disconnect();
-                    skeletonObserver = null;
-                    if (!autoplayStarted) {
-                        setTimeout(() => {
-                            startAllAutoplay();
-                        }, 500);
-                    }
-                }
-            }, 10000);
-        } else {
-            setTimeout(() => {
-                startAllAutoplay();
-            }, 1000);
-        }
-    }
-    function startAllAutoplay() {
-        if (autoplayStarted) return;
-        [
-            typeof swiperTopRow !== 'undefined' ? swiperTopRow : null,
-            typeof swiperBottomRow !== 'undefined' ? swiperBottomRow : null,
-            typeof swiperMobile !== 'undefined' ? swiperMobile : null
-        ].forEach(function (swiper) {
-            try {
-                if (swiper && swiper.autoplay) {
-                    if (!swiper.autoplay.running) {
-                        swiper.autoplay.start();
-                    }
-                }
-            } catch (e) {
             }
         });
-        autoplayStarted = true;
-    }
 
-    
-    document.addEventListener('visibilitychange', function () {
-        if (!document.hidden && autoplayStarted) {
-            setTimeout(() => {
+        skeletonObserver.observe(skeleton, { attributes: true, attributeFilter: ['style', 'class'] });
+        skeletonObserver.observe(document.body, { childList: true, subtree: true });
+
+        // Fallback in case skeleton never disappears properly
+        setTimeout(() => {
+            if (!autoplayStarted) {
                 startAllAutoplay();
-            }, 300);
-        }
-    });
+                if (skeletonObserver) {
+                    skeletonObserver.disconnect();
+                    skeletonObserver = null;
+                }
+            }
+        }, 10000);
+    } else {
+        // No skeleton found: start immediately
+        setTimeout(startAllAutoplay, 1000);
+    }
+}
+
+// Resume autoplay on visibility change
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && autoplayStarted) {
+        setTimeout(startAllAutoplay, 300);
+    }
+});
 });
 
 console.log('test     122222dsdsdsdsd sdsddssds');
