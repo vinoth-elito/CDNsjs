@@ -64,9 +64,7 @@ $crashGamesSec.on('scroll', function () {
     }
     resetAutoplay();
 });
-
 scrollTimer = setInterval(autoplay, 3000);
-
 var svgHandler = (function() {
     const processedLinks = new WeakSet();
     const processedImages = new WeakSet();
@@ -441,18 +439,6 @@ var swiperMobile = new Swiper('.crash__games__mobile', {
         el: '.swiper-pagination',
         clickable: true
     },
-    on: {
-        init: function() {
-            setTimeout(function() {
-                svgHandler.processAllLinks();
-            }, 150);
-        },
-        slideChange: function() {
-            setTimeout(function() {
-                svgHandler.processAllLinks();
-            }, 100);
-        }
-    },
     breakpoints: {
         640: {
             slidesPerView: 1,
@@ -478,7 +464,7 @@ var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
     },
     autoplay: {
         delay: 4000,
-        disableOnInteraction: false
+        disableOnInteraction: false,
     },
     speed: 500,
     pagination: {
@@ -486,18 +472,6 @@ var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
         clickable: true,
     },
     loop: true,
-    on: {
-        init: function() {
-            setTimeout(function() {
-                svgHandler.processAllLinks();
-            }, 150);
-        },
-        slideChange: function() {
-            setTimeout(function() {
-                svgHandler.processAllLinks();
-            }, 100);
-        }
-    }
 });
 var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
     slidesPerView: 4,
@@ -509,7 +483,7 @@ var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
     },
     autoplay: {
         delay: 4000,
-        disableOnInteraction: false
+        disableOnInteraction: false,
     },
     speed: 500,
     pagination: {
@@ -517,18 +491,6 @@ var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
         clickable: true,
     },
     loop: true,
-    on: {
-        init: function() {
-            setTimeout(function() {
-                svgHandler.processAllLinks();
-            }, 150);
-        },
-        slideChange: function() {
-            setTimeout(function() {
-                svgHandler.processAllLinks();
-            }, 100);
-        }
-    }
 });
 document.addEventListener('DOMContentLoaded', function () {
     function setupFallbackDetection(container) {
@@ -624,4 +586,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-console.log('fgghhhhhhj');
+console.log('ajith');
