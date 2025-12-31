@@ -1,104 +1,179 @@
-/* ===================== SCROLL AUTOPLAY ===================== */
-const $sec = $('.crash__games__sec');
-const $bar = $('.crash__games__bar');
-const childW = $sec.children().first().outerWidth(true);
-const total = $sec.children().length;
-let idx = 0, timer;
+/* =========================================================
+   CRASH GAMES HORIZONTAL AUTOPLAY + PROGRESS BAR
+========================================================= */
+var $crashGamesSec = $('.crash__games__sec');
+var $crashGamesBar = $('.crash__games__bar');
+var $children = $crashGamesSec.children();
+var childWidth = $children.first().outerWidth(true);
+var totalChildren = $children.length;
+var currentIndex = 0;
+var scrollTimer;
 
-$('.crash__games__scroll__sec').toggle(total > 1);
+$('.crash__games__scroll__sec').toggle(totalChildren > 1);
 
-function updateBar() {
-    const max = $sec.prop('scrollWidth') - $sec.width();
-    const w = max ? 5 + ($sec.scrollLeft() / max) * 95 : 5;
-    $bar.css('width', w + '%');
+function updateBarWidth() {
+    var scrollLeft = $crashGamesSec.scrollLeft();
+    var maxScroll = $crashGamesSec.prop('scrollWidth') - $crashGamesSec.width();
+    var width = maxScroll ? 5 + (scrollLeft / maxScroll) * 95 : 5;
+    $crashGamesBar.css('width', width + '%');
 }
 
-function autoplay() {
-    idx = (idx + 1) % total;
-    $sec.animate({ scrollLeft: idx * childW }, 500);
-    updateBar();
+function autoplayScroll() {
+    currentIndex++;
+    if (currentIndex >= totalChildren) {
+        currentIndex = 0;
+        $crashGamesSec.animate({ scrollLeft: 0 }, 500);
+    } else {
+        $crashGamesSec.animate({ scrollLeft: currentIndex * childWidth }, 500);
+    }
+    updateBarWidth();
 }
 
 function resetAutoplay() {
-    clearInterval(timer);
-    timer = setInterval(autoplay, 3000);
+    clearInterval(scrollTimer);
+    scrollTimer = setInterval(autoplayScroll, 3000);
 }
 
-$sec.on('scroll', function () {
-    idx = Math.round(this.scrollLeft / childW);
-    updateBar();
+$crashGamesSec.on('scroll', function () {
+    currentIndex = Math.round(this.scrollLeft / childWidth);
+    updateBarWidth();
     resetAutoplay();
 });
 
 resetAutoplay();
 
-/* ===================== SVG / IMG FALLBACK ===================== */
-const processed = new WeakSet();
+/* =========================================================
+   SVG / IMG FALLBACK HANDLER (OBJECT + IMG)
+========================================================= */
+var svgHandler = (function () {
+    const processed = new WeakSet();
 
-function handleMedia(el) {
-    if (processed.has(el)) return;
-    processed.add(el);
+    function handleMedia(el) {
+        if (processed.has(el)) return;
+        processed.add(el);
 
-    const box = el.closest('.svg__object__container');
-    const link = el.closest('.casinoLink, .casinoLinkremoved');
-    const fallback = box?.querySelector('.svg__fallback');
-    const imgUrl = link?.dataset.image;
+        const container = el.closest('.svg__object__container');
+        const link = el.closest('.casinoLink, .casinoLinkremoved');
+        const fallback = container?.querySelector('.svg__fallback');
+        const dataImage = link?.getAttribute('data-image');
 
-    function fail() {
-        el.style.display = 'none';
-        if (!imgUrl || !box) return fallback?.style.display = 'flex';
-        const i = new Image();
-        i.onload = () => box.style.background = `url(${imgUrl}) center/contain no-repeat`;
-        i.onerror = () => fallback?.style.display = 'flex';
-        i.src = imgUrl;
-        link?.classList.replace('casinoLink', 'casinoLinkremoved');
+        function showFallback() {
+            el.style.display = 'none';
+
+            if (dataImage && container) {
+                const img = new Image();
+                img.onload = function () {
+                    container.style.backgroundImage = 'url(' + dataImage + ')';
+                    container.style.backgroundSize = 'contain';
+                    container.style.backgroundPosition = 'center';
+                    container.style.backgroundRepeat = 'no-repeat';
+                    fallback && (fallback.style.display = 'none');
+                };
+                img.onerror = function () {
+                    fallback && (fallback.style.display = 'flex');
+                };
+                img.src = dataImage;
+            } else {
+                fallback && (fallback.style.display = 'flex');
+            }
+
+            if (link) {
+                link.classList.remove('casinoLink');
+                link.classList.add('casinoLinkremoved');
+            }
+        }
+
+        el.onload = function () {
+            el.style.opacity = '1';
+            fallback && (fallback.style.display = 'none');
+        };
+
+        el.onerror = showFallback;
+
+        if (el.complete && el.naturalWidth === 0) {
+            showFallback();
+        }
     }
 
-    el.onload = () => el.style.opacity = 1;
-    el.onerror = fail;
+    function processAll() {
+        document.querySelectorAll('.crash__svg__object').forEach(handleMedia);
+    }
 
-    if (el.complete && el.naturalWidth === 0) fail();
-}
+    return { processAll };
+})();
 
-function processSVG() {
-    document.querySelectorAll('.crash__svg__object').forEach(handleMedia);
-}
+/* =========================================================
+   MUTATION OBSERVER (DOM CHANGES / REMOVALS)
+========================================================= */
+document.querySelectorAll('.svg__object__container').forEach(function (container) {
+    new MutationObserver(svgHandler.processAll).observe(container, {
+        childList: true
+    });
+});
 
-setTimeout(processSVG, 150);
-window.addEventListener('load', processSVG);
-
-/* ===================== MUTATION OBSERVER ===================== */
-new MutationObserver(processSVG).observe(document.body, {
+new MutationObserver(svgHandler.processAll).observe(document.body, {
     childList: true,
     subtree: true
 });
 
-/* ===================== SWIPER FACTORY ===================== */
-function initSwiper(sel, slides = 4) {
-    return new Swiper(sel, {
+/* =========================================================
+   SWIPER FACTORY (MOBILE + TOP + BOTTOM)
+========================================================= */
+function initSwiper(selector, slides) {
+    return new Swiper(selector, {
+        loop: true,
         slidesPerView: slides,
         spaceBetween: 20,
-        loop: true,
         speed: 500,
-        autoplay: { delay: 3000, disableOnInteraction: false },
-        pagination: { el: '.swiper-pagination', clickable: true },
+        autoplay: {
+            delay: 3000,
+            disableOnInteraction: false,
+            pauseOnMouseEnter: false
+        },
+        pagination: {
+            el: '.swiper-pagination',
+            clickable: true
+        },
         on: {
-            init: processSVG,
-            slideChange: processSVG
+            init: function () {
+                this.autoplay?.start();
+                setTimeout(svgHandler.processAll, 150);
+            },
+            slideChange: function () {
+                setTimeout(svgHandler.processAll, 100);
+            }
         }
     });
 }
 
-const swiperMobile = initSwiper('.crash__games__mobile', 'auto');
-const swiperTop = initSwiper('.ks_mycrash_game_ab');
-const swiperBottom = initSwiper('.ks_mycrash_game_ab2');
+var swiperMobile = initSwiper('.crash__games__mobile', 'auto');
+var swiperTopRow = initSwiper('.ks_mycrash_game_ab', 4);
+var swiperBottomRow = initSwiper('.ks_mycrash_game_ab2', 4);
 
-/* ===================== AUTOPLAY RECOVERY ===================== */
-function ensureAutoplay() {
-    [swiperMobile, swiperTop, swiperBottom].forEach(s =>
-        s?.autoplay && !s.autoplay.running && s.autoplay.start()
-    );
+/* =========================================================
+   AUTOPLAY RECOVERY (BFCache / TAB SWITCH)
+========================================================= */
+function ensureAutoplayRunning() {
+    [swiperMobile, swiperTopRow, swiperBottomRow].forEach(function (swiper) {
+        if (swiper?.autoplay && !swiper.autoplay.running) {
+            swiper.autoplay.start();
+        }
+    });
 }
 
-setInterval(ensureAutoplay, 10000);
-document.addEventListener('visibilitychange', () => !document.hidden && ensureAutoplay());
+setInterval(ensureAutoplayRunning, 10000);
+
+document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) {
+        setTimeout(ensureAutoplayRunning, 1000);
+    }
+});
+
+/* =========================================================
+   INITIAL LOAD SAFETY
+========================================================= */
+document.addEventListener('DOMContentLoaded', svgHandler.processAll);
+window.addEventListener('load', function () {
+    setTimeout(svgHandler.processAll, 200);
+    setTimeout(svgHandler.processAll, 500);
+});
