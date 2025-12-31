@@ -75,16 +75,59 @@ var svgHandler = (function() {
         if (!svgObject) return false;
         
         try {
-            if (svgObject.contentDocument) return true;
-            if (svgObject.getSVGDocument && svgObject.getSVGDocument()) return true;
-            if (svgObject.complete === true) return true;
+            // Try to access contentDocument
+            const doc = svgObject.contentDocument;
+            if (doc) {
+                // Check if it has actual SVG content
+                const svgElement = doc.querySelector('svg');
+                if (svgElement) return true;
+            }
             
+            // Alternative check
+            if (svgObject.getSVGDocument && svgObject.getSVGDocument()) {
+                const svgDoc = svgObject.getSVGDocument();
+                if (svgDoc && svgDoc.querySelector('svg')) return true;
+            }
+            
+            // Check complete property
+            if (svgObject.complete === true) {
+                const data = svgObject.getAttribute('data');
+                if (data && svgObject.offsetWidth > 0 && svgObject.offsetHeight > 0) {
+                    return true;
+                }
+            }
+        } catch (e) {
+            // Cross-origin or access errors mean we can't verify
+            return false;
+        }
+        
+        return false;
+    }
+    
+    function isSvgFailed(svgObject) {
+        if (!svgObject) return true;
+        
+        try {
+            // Check if data attribute is missing or empty
             const data = svgObject.getAttribute('data');
-            if (data && svgObject.offsetWidth > 0 && svgObject.offsetHeight > 0) {
+            if (!data || data.trim() === '') return true;
+            
+            // If we can access contentDocument and it's empty or has error
+            const doc = svgObject.contentDocument;
+            if (doc) {
+                // No SVG element means failed
+                if (!doc.querySelector('svg')) {
+                    return true;
+                }
+            }
+            
+            // Check dimensions - if 0x0 after some time, likely failed
+            if (svgObject.offsetWidth === 0 && svgObject.offsetHeight === 0) {
                 return true;
             }
         } catch (e) {
-            console.debug('SVG check error:', e);
+            // Access errors might indicate failure
+            return false;
         }
         
         return false;
@@ -105,13 +148,10 @@ var svgHandler = (function() {
         let hasFailed = false;
         let checkInterval;
         let timeoutId;
-        
-        // Force opacity to 1 initially
-        svgObject.style.opacity = '1';
-        svgObject.style.display = '';
+        let errorFired = false;
         
         function showSvg() {
-            if (hasLoaded) return;
+            if (hasLoaded || hasFailed) return;
             hasLoaded = true;
             
             clearInterval(checkInterval);
@@ -126,7 +166,7 @@ var svgHandler = (function() {
         }
         
         function showFallback() {
-            if (hasFailed) return;
+            if (hasFailed || hasLoaded) return;
             hasFailed = true;
             
             clearInterval(checkInterval);
@@ -154,11 +194,19 @@ var svgHandler = (function() {
                 }
             };
             testImage.onerror = function () {
+                // Background image also failed
                 if (!hasLoaded) {
                     showFallback();
                 }
             };
             testImage.src = dataImage;
+        }
+        
+        // Check initial state
+        const initialData = svgObject.getAttribute('data');
+        if (!initialData || initialData.trim() === '') {
+            showFallback();
+            return;
         }
         
         // Check if already loaded
@@ -167,32 +215,58 @@ var svgHandler = (function() {
             return;
         }
         
+        // Start with opacity 0 until we confirm it loads
+        svgObject.style.opacity = '0';
+        
         // Listen for load event
-        svgObject.addEventListener('load', function onLoad() {
-            showSvg();
-            svgObject.removeEventListener('load', onLoad);
-        });
+        function onSvgLoad() {
+            if (!errorFired && !hasFailed) {
+                // Verify it actually loaded with content
+                setTimeout(function() {
+                    if (isSvgLoaded(svgObject)) {
+                        showSvg();
+                    } else if (isSvgFailed(svgObject)) {
+                        showFallback();
+                    }
+                }, 50);
+            }
+            svgObject.removeEventListener('load', onSvgLoad);
+        }
         
         // Listen for error event
-        svgObject.addEventListener('error', function onError() {
+        function onSvgError() {
+            errorFired = true;
             showFallback();
-            svgObject.removeEventListener('error', onError);
-        });
+            svgObject.removeEventListener('error', onSvgError);
+            svgObject.removeEventListener('load', onSvgLoad);
+        }
         
-        // Periodic checking
+        svgObject.addEventListener('load', onSvgLoad);
+        svgObject.addEventListener('error', onSvgError);
+        
+        // Periodic checking with interval
         let checkCount = 0;
-        const maxChecks = 50;
+        const maxChecks = 30; // Check for 3 seconds (30 * 100ms)
         
         checkInterval = setInterval(function() {
             checkCount++;
             
             if (isSvgLoaded(svgObject)) {
                 showSvg();
-            } else if (checkCount >= maxChecks) {
+            } else if (isSvgFailed(svgObject) && checkCount > 5) {
+                // Give it at least 500ms before considering it failed
                 showFallback();
+            } else if (checkCount >= maxChecks) {
+                // Timeout - check one more time
+                if (isSvgLoaded(svgObject)) {
+                    showSvg();
+                } else {
+                    showFallback();
+                }
             }
         }, 100);
         
+        // Absolute timeout as backup (5 seconds)
         timeoutId = setTimeout(function() {
             if (!hasLoaded && !hasFailed) {
                 if (isSvgLoaded(svgObject)) {
@@ -201,7 +275,7 @@ var svgHandler = (function() {
                     showFallback();
                 }
             }
-        }, 8000);
+        }, 5000);
     }
     
     function processAllLinks() {
@@ -464,4 +538,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-console.log('testdsdsdsd');
+console.log('testwqwqwqwqwqwqwqwqwqw');
