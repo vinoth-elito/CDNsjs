@@ -483,17 +483,20 @@ document.addEventListener('DOMContentLoaded', function () {
                     if ((node.classList && node.classList.contains('crash__svg__object')) || 
                         (node.tagName && (node.tagName.toLowerCase() === 'object' || node.tagName.toLowerCase() === 'img'))) {
                         
-                        const parentLink = mutation.target.closest('.casinoLink, .casinoLinkremoved');
+                        // Get the container (parent of the removed node)
+                        const container = node.parentElement;
+                        const parentLink = container ? container.closest('.casinoLink, .casinoLinkremoved') : null;
                         const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
-                        const fallback = mutation.target.querySelector('.svg__fallback');
+                        const fallback = container ? container.querySelector('.svg__fallback') : null;
                         
-                        if (dataImage && mutation.target) {
+                        if (dataImage && container) {
+                            // Test the data-image URL
                             const testImage = new Image();
                             testImage.onload = function () {
-                                mutation.target.style.backgroundImage = 'url(' + dataImage + ')';
-                                mutation.target.style.backgroundSize = 'contain';
-                                mutation.target.style.backgroundPosition = 'center';
-                                mutation.target.style.backgroundRepeat = 'no-repeat';
+                                container.style.backgroundImage = 'url(' + dataImage + ')';
+                                container.style.backgroundSize = 'contain';
+                                container.style.backgroundPosition = 'center';
+                                container.style.backgroundRepeat = 'no-repeat';
                                 if (fallback) {
                                     fallback.style.display = 'none';
                                 }
@@ -521,13 +524,38 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             });
         });
+        
+        // Observe for child list changes (when object/img is removed)
         observer.observe(container, {
             childList: true,
-            subtree: true
+            subtree: false // Only watch direct children changes
         });
     }
     
+    // Setup fallback detection on all containers
     document.querySelectorAll('.svg__object__container').forEach(setupFallbackDetection);
+    
+    // Also setup mutation observer on document to catch dynamically added containers
+    const globalObserver = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            mutation.addedNodes.forEach(function(node) {
+                if (node.nodeType === 1) { // Element node
+                    // Check if added node is a container or contains containers
+                    if (node.classList && node.classList.contains('svg__object__container')) {
+                        setupFallbackDetection(node);
+                    } else {
+                        const containers = node.querySelectorAll ? node.querySelectorAll('.svg__object__container') : [];
+                        containers.forEach(setupFallbackDetection);
+                    }
+                }
+            });
+        });
+    });
+    
+    globalObserver.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
     
     // Initial processing - start immediately
     setTimeout(function() {
@@ -563,4 +591,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-console.log('Swiper autoplay ALWAYS enabled with correct OBJECT/IMG handling');
+console.log('Swiper autoplay ALWAYS enabled with correct OBJECT/IMG handlingsasasas');
