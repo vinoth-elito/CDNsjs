@@ -445,7 +445,8 @@ var swiperMobile = new Swiper('.crash__games__mobile', {
     pagination: {
         el: '.swiper-pagination',
         clickable: true
-    }
+    },
+
     breakpoints: {
         640: {
             slidesPerView: 1,
