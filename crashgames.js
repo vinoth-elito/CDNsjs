@@ -67,7 +67,7 @@ $crashGamesSec.on('scroll', function () {
 
 scrollTimer = setInterval(autoplay, 3000);
 
-// Optimized SVG handler for fast loading of both IMG and OBJECT tags
+// Global SVG handler for both IMG and OBJECT tags
 var svgHandler = (function() {
     const processedLinks = new WeakSet();
     const processedElements = new WeakSet();
@@ -83,6 +83,7 @@ var svgHandler = (function() {
         const isImg = element.tagName === 'IMG';
         
         let resolved = false;
+        let backgroundImageLoaded = false;
         
         function markAsLoaded() {
             if (resolved) return;
@@ -108,15 +109,35 @@ var svgHandler = (function() {
             element.style.display = 'none';
             
             // Try to use data-image as fallback
-            if (dataImage && container) {
-                container.style.backgroundImage = 'url(' + dataImage + ')';
-                container.style.backgroundSize = 'contain';
-                container.style.backgroundPosition = 'center';
-                container.style.backgroundRepeat = 'no-repeat';
-                
+            if (dataImage && container && backgroundImageLoaded) {
+                // Background image already loaded successfully
                 if (fallback) {
                     fallback.style.display = 'none';
                 }
+            } else if (dataImage && container) {
+                // Try to load data-image
+                const testImage = new Image();
+                testImage.onload = function() {
+                    container.style.backgroundImage = 'url(' + dataImage + ')';
+                    container.style.backgroundSize = 'contain';
+                    container.style.backgroundPosition = 'center';
+                    container.style.backgroundRepeat = 'no-repeat';
+                    
+                    if (fallback) {
+                        fallback.style.display = 'none';
+                    }
+                };
+                testImage.onerror = function() {
+                    // Both element and data-image failed - show fallback
+                    if (fallback) {
+                        fallback.style.display = 'flex';
+                    }
+                    if (link) {
+                        link.classList.remove('casinoLink');
+                        link.classList.add('casinoLinkremoved');
+                    }
+                };
+                testImage.src = dataImage;
             } else {
                 // No data-image available - show fallback
                 if (fallback) {
@@ -148,12 +169,87 @@ var svgHandler = (function() {
         // Start hidden initially
         element.style.opacity = '0';
         
-        // Preload with Image object for faster detection
-        const preloadImg = new Image();
-        preloadImg.onload = function() {
-            // URL is accessible - set up event listeners
+        // Pre-test BOTH URLs (mediaUrl and dataImage) in parallel
+        let mediaUrlTested = false;
+        let dataImageTested = false;
+        let mediaUrlAccessible = false;
+        let dataImageAccessible = false;
+        
+        function checkAllTestsComplete() {
+            if (mediaUrlTested && dataImageTested && !resolved) {
+                if (mediaUrlAccessible) {
+                    // Media URL is accessible, wait for it to load
+                    setupMediaElementLoading();
+                } else {
+                    // Media URL failed, check data-image
+                    if (dataImageAccessible && dataImage && container) {
+                        // Data-image is accessible, use it as fallback
+                        container.style.backgroundImage = 'url(' + dataImage + ')';
+                        container.style.backgroundSize = 'contain';
+                        container.style.backgroundPosition = 'center';
+                        container.style.backgroundRepeat = 'no-repeat';
+                        backgroundImageLoaded = true;
+                        if (fallback) {
+                            fallback.style.display = 'none';
+                        }
+                        if (link) {
+                            link.classList.remove('casinoLink');
+                            link.classList.add('casinoLinkremoved');
+                        }
+                    } else {
+                        // Both failed - show fallback
+                        markAsFailed();
+                    }
+                }
+            }
+        }
+        
+        // Test media URL (SVG URL)
+        const mediaTestImg = new Image();
+        mediaTestImg.onload = function() {
+            mediaUrlTested = true;
+            mediaUrlAccessible = true;
+            checkAllTestsComplete();
+        };
+        mediaTestImg.onerror = function() {
+            mediaUrlTested = true;
+            mediaUrlAccessible = false;
+            checkAllTestsComplete();
+        };
+        mediaTestImg.src = mediaUrl;
+        
+        // Test data-image URL
+        if (dataImage) {
+            const dataTestImg = new Image();
+            dataTestImg.onload = function() {
+                dataImageTested = true;
+                dataImageAccessible = true;
+                backgroundImageLoaded = true;
+                
+                // Set background immediately while we wait for media element
+                if (container && !resolved) {
+                    container.style.backgroundImage = 'url(' + dataImage + ')';
+                    container.style.backgroundSize = 'contain';
+                    container.style.backgroundPosition = 'center';
+                    container.style.backgroundRepeat = 'no-repeat';
+                }
+                checkAllTestsComplete();
+            };
+            dataTestImg.onerror = function() {
+                dataImageTested = true;
+                dataImageAccessible = false;
+                checkAllTestsComplete();
+            };
+            dataTestImg.src = dataImage;
+        } else {
+            dataImageTested = true;
+            dataImageAccessible = false;
+            checkAllTestsComplete();
+        }
+        
+        function setupMediaElementLoading() {
+            // Media URL is accessible, set up event listeners
             if (isImg) {
-                // For IMG tags - use browser's natural loading
                 element.addEventListener('load', function onLoad() {
                     markAsLoaded();
                     element.removeEventListener('load', onLoad);
@@ -173,18 +269,7 @@ var svgHandler = (function() {
                     }
                 }
             } else if (isObject) {
-                // For OBJECT tags - use faster loading approach
-                
-                // Set data-image as background immediately while object loads
-                if (dataImage && container) {
-                    container.style.backgroundImage = 'url(' + dataImage + ')';
-                    container.style.backgroundSize = 'contain';
-                    container.style.backgroundPosition = 'center';
-                    container.style.backgroundRepeat = 'no-repeat';
-                }
-                
                 element.addEventListener('load', function onLoad() {
-                    // Object loaded successfully - show it and remove background
                     setTimeout(function() {
                         markAsLoaded();
                     }, 100);
@@ -192,17 +277,11 @@ var svgHandler = (function() {
                 }, { once: true });
                 
                 element.addEventListener('error', function onError() {
-                    // Object failed - keep background image
-                    element.style.opacity = '0';
-                    element.style.display = 'none';
-                    if (link) {
-                        link.classList.remove('casinoLink');
-                        link.classList.add('casinoLinkremoved');
-                    }
+                    markAsFailed();
                     element.removeEventListener('error', onError);
                 }, { once: true });
                 
-                // Fast check for object - if it has dimensions after short delay
+                // Fast check for object
                 setTimeout(function() {
                     if (!resolved && element.offsetWidth > 0 && element.offsetHeight > 0) {
                         markAsLoaded();
@@ -213,25 +292,10 @@ var svgHandler = (function() {
             // Overall timeout
             setTimeout(function() {
                 if (!resolved) {
-                    if (isObject && element.offsetWidth > 0 && element.offsetHeight > 0) {
-                        markAsLoaded();
-                    } else if (isImg && element.complete && element.naturalHeight > 0 && element.naturalWidth > 0) {
-                        markAsLoaded();
-                    } else {
-                        markAsFailed();
-                    }
+                    markAsFailed();
                 }
-            }, 3000); // Reduced timeout for faster fallback
-        };
-        
-        preloadImg.onerror = function() {
-            // URL is NOT accessible - mark as failed immediately
-            setTimeout(function() {
-                markAsFailed();
-            }, 50);
-        };
-        
-        preloadImg.src = mediaUrl;
+            }, 3000);
+        }
     }
     
     function handleSvgElement(link) {
@@ -244,19 +308,6 @@ var svgHandler = (function() {
         // Check for object element first
         const objectElement = container.querySelector('object.crash__svg__object');
         const imgElement = container.querySelector('img.crash__svg__object');
-        
-        // Set data-image as background immediately (for both object and img)
-        const dataImage = link.getAttribute('data-image');
-        if (dataImage) {
-            const testImage = new Image();
-            testImage.onload = function() {
-                container.style.backgroundImage = 'url(' + dataImage + ')';
-                container.style.backgroundSize = 'contain';
-                container.style.backgroundPosition = 'center';
-                container.style.backgroundRepeat = 'no-repeat';
-            };
-            testImage.src = dataImage;
-        }
         
         // Handle object element if present (priority for SVG)
         if (objectElement) {
@@ -437,13 +488,26 @@ document.addEventListener('DOMContentLoaded', function () {
                         const fallback = mutation.target.querySelector('.svg__fallback');
                         
                         if (dataImage && mutation.target) {
-                            mutation.target.style.backgroundImage = 'url(' + dataImage + ')';
-                            mutation.target.style.backgroundSize = 'contain';
-                            mutation.target.style.backgroundPosition = 'center';
-                            mutation.target.style.backgroundRepeat = 'no-repeat';
-                            if (fallback) {
-                                fallback.style.display = 'none';
-                            }
+                            const testImage = new Image();
+                            testImage.onload = function () {
+                                mutation.target.style.backgroundImage = 'url(' + dataImage + ')';
+                                mutation.target.style.backgroundSize = 'contain';
+                                mutation.target.style.backgroundPosition = 'center';
+                                mutation.target.style.backgroundRepeat = 'no-repeat';
+                                if (fallback) {
+                                    fallback.style.display = 'none';
+                                }
+                            };
+                            testImage.onerror = function () {
+                                if (fallback) {
+                                    fallback.style.display = 'flex';
+                                }
+                                if (parentLink) {
+                                    parentLink.classList.remove('casinoLink');
+                                    parentLink.classList.add('casinoLinkremoved');
+                                }
+                            };
+                            testImage.src = dataImage;
                         } else {
                             if (fallback) {
                                 fallback.style.display = 'flex';
@@ -499,4 +563,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-console.log('Swiper autoplay ALWAYS enabled with fast OBJECT/IMG loading');
+console.log('Swiper autoplay ALWAYS enabled with correct OBJECT/IMG handling');
