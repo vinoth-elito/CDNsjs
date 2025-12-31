@@ -68,60 +68,126 @@ $crashGamesSec.on('scroll', function () {
 scrollTimer = setInterval(autoplay, 3000);
 
 // Global SVG handler
+// Enhanced handler for both SVG and IMG elements
 var svgHandler = (function() {
     const processedLinks = new WeakSet();
+    const processedImages = new WeakSet();
     
     function isSvgLoaded(svgObject) {
-        if (!svgObject) return false;
-        
-        try {
-            // Try to access contentDocument
-            const doc = svgObject.contentDocument;
-            if (doc) {
-                const svgElement = doc.querySelector('svg');
-                if (svgElement) {
-                    return true;
-                }
-            }
-            
-            // Alternative method
-            if (svgObject.getSVGDocument) {
-                try {
-                    const svgDoc = svgObject.getSVGDocument();
-                    if (svgDoc && svgDoc.querySelector('svg')) {
-                        return true;
-                    }
-                } catch (e) {
-                    // CORS blocked - but check if it visually loaded
-                }
-            }
-        } catch (e) {
-            // CORS or access denied - check alternate indicators
-        }
-        
-        // If we can't access content due to CORS, check visual indicators
-        // If the object has dimensions and data attribute, assume it loaded
-        if (svgObject.offsetWidth > 0 && svgObject.offsetHeight > 0) {
-            const dataUrl = svgObject.getAttribute('data');
-            if (dataUrl && dataUrl.trim() !== '') {
-                // Object is visible with valid data - likely loaded successfully despite CORS
-                return true;
-            }
-        }
-        
-        return false;
+        // ... keep your existing isSvgLoaded function unchanged ...
     }
     
-    function testSvgUrl(url, onSuccess, onError) {
-        // Test if the SVG URL is accessible
-        const testImg = new Image();
-        testImg.onload = function() {
-            onSuccess();
-        };
-        testImg.onerror = function() {
-            onError();
-        };
-        testImg.src = url;
+    function handleImageElement(imgElement, link) {
+        if (processedImages.has(imgElement)) return;
+        processedImages.add(imgElement);
+        
+        const container = imgElement.closest('.svg__object__container');
+        const fallback = container ? container.querySelector('.svg__fallback') : null;
+        const dataImage = link ? link.getAttribute('data-image') : null;
+        
+        let resolved = false;
+        
+        function markAsLoaded() {
+            if (resolved) return;
+            resolved = true;
+            
+            imgElement.style.opacity = '1';
+            imgElement.style.display = '';
+            
+            // Remove any background from container
+            if (container) {
+                container.style.backgroundImage = 'none';
+            }
+            
+            // Hide fallback
+            if (fallback) {
+                fallback.style.display = 'none';
+            }
+        }
+        
+        function markAsFailed() {
+            if (resolved) return;
+            resolved = true;
+            
+            imgElement.style.opacity = '0';
+            imgElement.style.display = 'none';
+            
+            // Try to use data-image as fallback
+            if (dataImage && container) {
+                const testImage = new Image();
+                testImage.onload = function() {
+                    container.style.backgroundImage = 'url(' + dataImage + ')';
+                    container.style.backgroundSize = 'contain';
+                    container.style.backgroundPosition = 'center';
+                    container.style.backgroundRepeat = 'no-repeat';
+                    
+                    if (fallback) {
+                        fallback.style.display = 'none';
+                    }
+                };
+                testImage.onerror = function() {
+                    // Both img and data-image failed - show fallback
+                    if (fallback) {
+                        fallback.style.display = 'flex';
+                    }
+                    if (link) {
+                        link.classList.remove('casinoLink');
+                        link.classList.add('casinoLinkremoved');
+                    }
+                };
+                testImage.src = dataImage;
+            } else {
+                // No data-image available - show fallback
+                if (fallback) {
+                    fallback.style.display = 'flex';
+                }
+                if (link) {
+                    link.classList.remove('casinoLink');
+                    link.classList.add('casinoLinkremoved');
+                }
+            }
+        }
+        
+        // Check if image already loaded
+        if (imgElement.complete) {
+            if (imgElement.naturalHeight > 0 && imgElement.naturalWidth > 0) {
+                // Image already loaded successfully
+                markAsLoaded();
+            } else {
+                // Image already failed
+                markAsFailed();
+            }
+        } else {
+            // Image hasn't loaded yet
+            imgElement.style.opacity = '0';
+            
+            // Set up load/error listeners
+            imgElement.addEventListener('load', function onLoad() {
+                markAsLoaded();
+                imgElement.removeEventListener('load', onLoad);
+            }, { once: true });
+            
+            imgElement.addEventListener('error', function onError() {
+                markAsFailed();
+                imgElement.removeEventListener('error', onError);
+            }, { once: true });
+            
+            // Set timeout in case events don't fire
+            setTimeout(function() {
+                if (!resolved) {
+                    if (imgElement.complete) {
+                        if (imgElement.naturalHeight > 0 && imgElement.naturalWidth > 0) {
+                            markAsLoaded();
+                        } else {
+                            markAsFailed();
+                        }
+                    } else {
+                        // Still loading after timeout, consider failed
+                        markAsFailed();
+                    }
+                }
+            }, 5000); // 5 second timeout
+        }
     }
     
     function handleSvgElement(link) {
@@ -131,8 +197,16 @@ var svgHandler = (function() {
         const dataImage = link.getAttribute('data-image');
         const container = link.querySelector('.svg__object__container');
         const svgObject = link.querySelector('.crash__svg__object');
+        const imgElement = link.querySelector('img'); // Check for img elements
         const fallback = link.querySelector('.svg__fallback');
         
+        // Handle img element if present (priority)
+        if (imgElement) {
+            handleImageElement(imgElement, link);
+            return;
+        }
+        
+        // Original SVG handling code (keep your existing code)
         if (!container || !svgObject) return;
         
         const svgDataUrl = svgObject.getAttribute('data');
@@ -149,149 +223,20 @@ var svgHandler = (function() {
             return;
         }
         
-        let resolved = false;
-        let checkInterval;
-        let maxTimeout;
-        let loadEventFired = false;
-        let errorEventFired = false;
-        
-        function markAsLoaded() {
-            if (resolved) return;
-            resolved = true;
-            
-            clearInterval(checkInterval);
-            clearTimeout(maxTimeout);
-            
-            // SVG loaded successfully
-            svgObject.style.opacity = '1';
-            svgObject.style.display = '';
-            container.style.backgroundImage = 'none';
-            if (fallback) {
-                fallback.style.display = 'none';
-            }
-        }
-        
-        function markAsFailed() {
-            if (resolved) return;
-            resolved = true;
-            
-            clearInterval(checkInterval);
-            clearTimeout(maxTimeout);
-            
-            // SVG failed to load - show fallback
-            svgObject.style.opacity = '0';
-            svgObject.style.display = 'none';
-            
-            if (fallback) {
-                fallback.style.display = 'flex';
-            }
-            link.classList.remove('casinoLink');
-            link.classList.add('casinoLinkremoved');
-        }
-        
-        // Setup background image (if available)
-        if (dataImage) {
-            const testImage = new Image();
-            testImage.onload = function () {
-                container.style.backgroundImage = 'url(' + dataImage + ')';
-                container.style.backgroundSize = 'contain';
-                container.style.backgroundPosition = 'center';
-                container.style.backgroundRepeat = 'no-repeat';
-            };
-            testImage.src = dataImage;
-        }
-        
-        // Check if already loaded
-        if (isSvgLoaded(svgObject)) {
-            markAsLoaded();
-            return;
-        }
-        
-        // Start hidden until we know the result
-        svgObject.style.opacity = '0';
-        
-        // Listen for successful load
-        svgObject.addEventListener('load', function onLoad() {
-            loadEventFired = true;
-            // Wait a bit for rendering
-            setTimeout(function() {
-                if (!errorEventFired) {
-                    // Load event fired - consider it successful
-                    // Even if we can't access contentDocument due to CORS
-                    markAsLoaded();
-                }
-            }, 100);
-            svgObject.removeEventListener('load', onLoad);
-        }, { once: true });
-        
-        // Listen for error
-        svgObject.addEventListener('error', function onError() {
-            errorEventFired = true;
-            markAsFailed();
-            svgObject.removeEventListener('error', onError);
-        }, { once: true });
-        
-        // Test the URL accessibility as backup
-        testSvgUrl(svgDataUrl, 
-            function() {
-                // URL is accessible - if load event doesn't fire, still consider checking
-            },
-            function() {
-                // URL returned error - mark as failed
-                if (!loadEventFired && !resolved) {
-                    setTimeout(function() {
-                        if (!loadEventFired && !resolved) {
-                            markAsFailed();
-                        }
-                    }, 1000);
-                }
-            }
-        );
-        
-        // Polling mechanism - check every 150ms
-        let checkCount = 0;
-        const maxChecks = 30; // 4.5 seconds total (30 * 150ms)
-        
-        checkInterval = setInterval(function() {
-            checkCount++;
-            
-            if (errorEventFired) {
-                // Already failed
-                return;
-            }
-            
-            if (loadEventFired || isSvgLoaded(svgObject)) {
-                // Successfully loaded
-                markAsLoaded();
-            } else if (checkCount >= maxChecks) {
-                // Timeout reached
-                // Check one more time if it has visual dimensions (CORS case)
-                if (svgObject.offsetWidth > 0 && svgObject.offsetHeight > 0) {
-                    // Has dimensions - likely loaded but CORS blocked access
-                    markAsLoaded();
-                } else {
-                    // No dimensions - failed
-                    markAsFailed();
-                }
-            }
-        }, 150);
-        
-        // Absolute maximum timeout (6 seconds)
-        maxTimeout = setTimeout(function() {
-            if (!resolved) {
-                // Final check
-                if (loadEventFired || isSvgLoaded(svgObject) || 
-                    (svgObject.offsetWidth > 0 && svgObject.offsetHeight > 0)) {
-                    markAsLoaded();
-                } else {
-                    markAsFailed();
-                }
-            }
-        }, 6000);
+        // ... rest of your existing handleSvgElement code ...
     }
     
     function processAllLinks() {
+        // Process all casino links (for SVG)
         document.querySelectorAll('.casinoLink').forEach(handleSvgElement);
+        
+        // Also process any img elements that might not be in .casinoLink containers
+        document.querySelectorAll('.svg__object__container img').forEach(function(img) {
+            if (!processedImages.has(img)) {
+                const link = img.closest('.casinoLink, .casinoLinkremoved');
+                handleImageElement(img, link);
+            }
+        });
     }
     
     return {
@@ -398,35 +343,26 @@ var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
 
 document.addEventListener('DOMContentLoaded', function () {
     function setupFallbackDetection(container) {
-        const observer = new MutationObserver(function (mutations) {
-            mutations.forEach(function (mutation) {
-                mutation.removedNodes.forEach(function (node) {
-                    if (node.classList && node.classList.contains('crash__svg__object')) {
-                        const parentLink = mutation.target.closest('.casinoLink, .casinoLinkremoved');
-                        const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
-                        const fallback = mutation.target.querySelector('.svg__fallback');
-                        if (dataImage) {
-                            const testImage = new Image();
-                            testImage.onload = function () {
-                                mutation.target.style.backgroundImage = 'url(' + dataImage + ')';
-                                mutation.target.style.backgroundSize = 'contain';
-                                mutation.target.style.backgroundPosition = 'center';
-                                mutation.target.style.backgroundRepeat = 'no-repeat';
-                                if (fallback) {
-                                    fallback.style.display = 'none';
-                                }
-                            };
-                            testImage.onerror = function () {
-                                if (fallback) {
-                                    fallback.style.display = 'flex';
-                                }
-                                if (parentLink) {
-                                    parentLink.classList.remove('casinoLink');
-                                    parentLink.classList.add('casinoLinkremoved');
-                                }
-                            };
-                            testImage.src = dataImage;
-                        } else {
+    const observer = new MutationObserver(function (mutations) {
+        mutations.forEach(function (mutation) {
+            mutation.removedNodes.forEach(function (node) {
+                // Handle SVG object removal
+                if (node.classList && node.classList.contains('crash__svg__object')) {
+                    const parentLink = mutation.target.closest('.casinoLink, .casinoLinkremoved');
+                    const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
+                    const fallback = mutation.target.querySelector('.svg__fallback');
+                    if (dataImage) {
+                        const testImage = new Image();
+                        testImage.onload = function () {
+                            mutation.target.style.backgroundImage = 'url(' + dataImage + ')';
+                            mutation.target.style.backgroundSize = 'contain';
+                            mutation.target.style.backgroundPosition = 'center';
+                            mutation.target.style.backgroundRepeat = 'no-repeat';
+                            if (fallback) {
+                                fallback.style.display = 'none';
+                            }
+                        };
+                        testImage.onerror = function () {
                             if (fallback) {
                                 fallback.style.display = 'flex';
                             }
@@ -434,16 +370,65 @@ document.addEventListener('DOMContentLoaded', function () {
                                 parentLink.classList.remove('casinoLink');
                                 parentLink.classList.add('casinoLinkremoved');
                             }
+                        };
+                        testImage.src = dataImage;
+                    } else {
+                        if (fallback) {
+                            fallback.style.display = 'flex';
+                        }
+                        if (parentLink) {
+                            parentLink.classList.remove('casinoLink');
+                            parentLink.classList.add('casinoLinkremoved');
                         }
                     }
-                });
+                }
+                
+                // Handle IMG element removal
+                if (node.tagName && node.tagName.toLowerCase() === 'img') {
+                    const parentLink = node.closest('.casinoLink, .casinoLinkremoved');
+                    const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
+                    const container = node.parentElement;
+                    const fallback = container ? container.querySelector('.svg__fallback') : null;
+                    
+                    if (dataImage && container) {
+                        const testImage = new Image();
+                        testImage.onload = function () {
+                            container.style.backgroundImage = 'url(' + dataImage + ')';
+                            container.style.backgroundSize = 'contain';
+                            container.style.backgroundPosition = 'center';
+                            container.style.backgroundRepeat = 'no-repeat';
+                            if (fallback) {
+                                fallback.style.display = 'none';
+                            }
+                        };
+                        testImage.onerror = function () {
+                            if (fallback) {
+                                fallback.style.display = 'flex';
+                            }
+                            if (parentLink) {
+                                parentLink.classList.remove('casinoLink');
+                                parentLink.classList.add('casinoLinkremoved');
+                            }
+                        };
+                        testImage.src = dataImage;
+                    } else {
+                        if (fallback) {
+                            fallback.style.display = 'flex';
+                        }
+                        if (parentLink) {
+                            parentLink.classList.remove('casinoLink');
+                            parentLink.classList.add('casinoLinkremoved');
+                        }
+                    }
+                }
             });
         });
-        observer.observe(container, {
-            childList: true,
-            subtree: true
-        });
-    }
+    });
+    observer.observe(container, {
+        childList: true,
+        subtree: true
+    });
+}
     
     document.querySelectorAll('.svg__object__container').forEach(setupFallbackDetection);
     
@@ -549,4 +534,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-console.log('test     dsdsdsdsdsdsd');
+console.log('test     122222');
