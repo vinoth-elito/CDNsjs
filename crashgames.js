@@ -433,7 +433,10 @@ var swiperMobile = new Swiper('.crash__games__mobile', {
     loop: true,
     slidesPerView: 'auto',
     spaceBetween: 10,
-    autoplay: false,
+    autoplay: {
+        delay: 4000,
+        disableOnInteraction: false
+    },
     pagination: {
         el: '.swiper-pagination',
         clickable: true
@@ -473,7 +476,10 @@ var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
         sensitivity: 1,
         releaseOnEdges: true,
     },
-    autoplay: false,
+    autoplay: {
+        delay: 4000,
+        disableOnInteraction: false
+    },
     speed: 500,
     pagination: {
         el: ".swiper-pagination",
@@ -501,7 +507,10 @@ var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
         sensitivity: 1,
         releaseOnEdges: true,
     },
-    autoplay: false,
+    autoplay: {
+        delay: 4000,
+        disableOnInteraction: false
+    },
     speed: 500,
     pagination: {
         el: ".swiper-pagination",
@@ -615,4 +624,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-console.log('cxcxcxc sasasasasas');
+console.log('fgghhhhhhj');
