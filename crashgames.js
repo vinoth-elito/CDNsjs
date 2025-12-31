@@ -67,6 +67,68 @@ $crashGamesSec.on('scroll', function () {
 
 scrollTimer = setInterval(autoplay, 3000);
 
+
+var swiperMobile = new Swiper('.crash__games__mobile', {
+    loop: true,
+    slidesPerView: 'auto',
+    spaceBetween: 10,
+    autoplay: false,
+    pagination: {
+        el: '.swiper-pagination',
+        clickable: true
+    },
+    breakpoints: {
+        640: {
+            slidesPerView: 1,
+            spaceBetween: 20
+        },
+        768: {
+            slidesPerView: 1,
+            spaceBetween: 10
+        },
+        1024: {
+            slidesPerView: 1,
+            spaceBetween: 10
+        }
+    }
+});
+
+
+var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
+    slidesPerView: 4,
+    spaceBetween: 20,
+    mousewheel: {
+        forceToAxis: true,
+        sensitivity: 1,
+        releaseOnEdges: true,
+    },
+    autoplay: false,
+    speed: 500,
+    pagination: {
+        el: ".swiper-pagination",
+        clickable: true,
+    },
+    loop: true,
+});
+
+
+var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
+    slidesPerView: 4,
+    spaceBetween: 20,
+    mousewheel: {
+        forceToAxis: true,
+        sensitivity: 1,
+        releaseOnEdges: true,
+    },
+    autoplay: false,
+    speed: 500,
+    pagination: {
+        el: ".swiper-pagination",
+        clickable: true,
+    },
+    loop: true,
+});
+
 // Global SVG handler
 // Enhanced handler for both SVG and IMG elements
 var svgHandler = (function() {
