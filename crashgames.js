@@ -445,19 +445,7 @@ var swiperMobile = new Swiper('.crash__games__mobile', {
     pagination: {
         el: '.swiper-pagination',
         clickable: true
-    },
-    on: {
-        init: function() {
-            setTimeout(function() {
-                svgHandler.processAllLinks();
-            }, 150);
-        },
-        slideChange: function() {
-            setTimeout(function() {
-                svgHandler.processAllLinks();
-            }, 100);
-        }
-    },
+    }
     breakpoints: {
         640: {
             slidesPerView: 1,
@@ -493,19 +481,7 @@ var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
         el: ".swiper-pagination",
         clickable: true,
     },
-    loop: true,
-    on: {
-        init: function() {
-            setTimeout(function() {
-                svgHandler.processAllLinks();
-            }, 150);
-        },
-        slideChange: function() {
-            setTimeout(function() {
-                svgHandler.processAllLinks();
-            }, 100);
-        }
-    }
+    loop: true
 });
 
 var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
@@ -527,19 +503,7 @@ var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
         el: ".swiper-pagination",
         clickable: true,
     },
-    loop: true,
-    on: {
-        init: function() {
-            setTimeout(function() {
-                svgHandler.processAllLinks();
-            }, 150);
-        },
-        slideChange: function() {
-            setTimeout(function() {
-                svgHandler.processAllLinks();
-            }, 100);
-        }
-    }
+    loop: true
 });
 
 document.addEventListener('DOMContentLoaded', function () {
