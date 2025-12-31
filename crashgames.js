@@ -67,54 +67,57 @@ $crashGamesSec.on('scroll', function () {
 
 scrollTimer = setInterval(autoplay, 3000);
 
-// Global SVG handler
+// Global SVG handler for both IMG and OBJECT tags
 var svgHandler = (function() {
     const processedLinks = new WeakSet();
-    const processedImages = new WeakSet();
+    const processedElements = new WeakSet();
     
-    function isSvgLoaded(svgObject) {
-        if (!svgObject) return false;
+    function isSvgLoaded(element) {
+        if (!element) return false;
         
-        try {
-            // Try to access contentDocument
-            const doc = svgObject.contentDocument;
-            if (doc) {
-                const svgElement = doc.querySelector('svg');
-                if (svgElement) {
+        // Handle OBJECT elements
+        if (element.tagName === 'OBJECT') {
+            try {
+                const doc = element.contentDocument;
+                if (doc) {
+                    const svgElement = doc.querySelector('svg');
+                    if (svgElement) {
+                        return true;
+                    }
+                }
+                
+                if (element.getSVGDocument) {
+                    try {
+                        const svgDoc = element.getSVGDocument();
+                        if (svgDoc && svgDoc.querySelector('svg')) {
+                            return true;
+                        }
+                    } catch (e) {
+                        // CORS blocked
+                    }
+                }
+            } catch (e) {
+                // CORS or access denied
+            }
+            
+            // Check visual indicators
+            if (element.offsetWidth > 0 && element.offsetHeight > 0) {
+                const dataUrl = element.getAttribute('data');
+                if (dataUrl && dataUrl.trim() !== '') {
                     return true;
                 }
             }
-            
-            // Alternative method
-            if (svgObject.getSVGDocument) {
-                try {
-                    const svgDoc = svgObject.getSVGDocument();
-                    if (svgDoc && svgDoc.querySelector('svg')) {
-                        return true;
-                    }
-                } catch (e) {
-                    // CORS blocked - but check if it visually loaded
-                }
-            }
-        } catch (e) {
-            // CORS or access denied - check alternate indicators
         }
         
-        // If we can't access content due to CORS, check visual indicators
-        // If the object has dimensions and data attribute, assume it loaded
-        if (svgObject.offsetWidth > 0 && svgObject.offsetHeight > 0) {
-            const dataUrl = svgObject.getAttribute('data');
-            if (dataUrl && dataUrl.trim() !== '') {
-                // Object is visible with valid data - likely loaded successfully despite CORS
-                return true;
-            }
+        // Handle IMG elements
+        if (element.tagName === 'IMG') {
+            return element.complete && element.naturalHeight > 0 && element.naturalWidth > 0;
         }
         
         return false;
     }
     
-    function testSvgUrl(url, onSuccess, onError) {
-        // Test if the SVG URL is accessible
+    function testUrl(url, onSuccess, onError) {
         const testImg = new Image();
         testImg.onload = function() {
             onSuccess();
@@ -125,13 +128,15 @@ var svgHandler = (function() {
         testImg.src = url;
     }
     
-    function handleImageElement(imgElement, link) {
-        if (processedImages.has(imgElement)) return;
-        processedImages.add(imgElement);
+    function handleMediaElement(element, link) {
+        if (processedElements.has(element)) return;
+        processedElements.add(element);
         
-        const container = imgElement.closest('.svg__object__container');
+        const container = element.closest('.svg__object__container');
         const fallback = container ? container.querySelector('.svg__fallback') : null;
         const dataImage = link ? link.getAttribute('data-image') : null;
+        const isObject = element.tagName === 'OBJECT';
+        const isImg = element.tagName === 'IMG';
         
         let resolved = false;
         
@@ -139,15 +144,13 @@ var svgHandler = (function() {
             if (resolved) return;
             resolved = true;
             
-            imgElement.style.opacity = '1';
-            imgElement.style.display = '';
+            element.style.opacity = '1';
+            element.style.display = '';
             
-            // Remove any background from container
             if (container) {
                 container.style.backgroundImage = 'none';
             }
             
-            // Hide fallback
             if (fallback) {
                 fallback.style.display = 'none';
             }
@@ -157,8 +160,8 @@ var svgHandler = (function() {
             if (resolved) return;
             resolved = true;
             
-            imgElement.style.opacity = '0';
-            imgElement.style.display = 'none';
+            element.style.opacity = '0';
+            element.style.display = 'none';
             
             // Try to use data-image as fallback
             if (dataImage && container) {
@@ -174,7 +177,7 @@ var svgHandler = (function() {
                     }
                 };
                 testImage.onerror = function() {
-                    // Both img and data-image failed - show fallback
+                    // Both element and data-image failed - show fallback
                     if (fallback) {
                         fallback.style.display = 'flex';
                     }
@@ -196,231 +199,131 @@ var svgHandler = (function() {
             }
         }
         
-        // Check if image already loaded
-        if (imgElement.complete) {
-            if (imgElement.naturalHeight > 0 && imgElement.naturalWidth > 0) {
-                // Image already loaded successfully
-                markAsLoaded();
-            } else {
-                // Image already failed
-                markAsFailed();
-            }
-        } else {
-            // Image hasn't loaded yet
-            imgElement.style.opacity = '0';
-            
-            // Set up load/error listeners
-            imgElement.addEventListener('load', function onLoad() {
-                markAsLoaded();
-                imgElement.removeEventListener('load', onLoad);
-            }, { once: true });
-            
-            imgElement.addEventListener('error', function onError() {
-                markAsFailed();
-                imgElement.removeEventListener('error', onError);
-            }, { once: true });
-            
-            // Set timeout in case events don't fire
-            setTimeout(function() {
-                if (!resolved) {
-                    if (imgElement.complete) {
-                        if (imgElement.naturalHeight > 0 && imgElement.naturalWidth > 0) {
-                            markAsLoaded();
-                        } else {
+        // Check if already loaded
+        if (isSvgLoaded(element)) {
+            markAsLoaded();
+            return;
+        }
+        
+        // Element hasn't loaded yet
+        element.style.opacity = '0';
+        
+        // Get the URL to test
+        let mediaUrl = '';
+        if (isObject) {
+            mediaUrl = element.getAttribute('data');
+        } else if (isImg) {
+            mediaUrl = element.getAttribute('src');
+        }
+        
+        // Test URL accessibility
+        if (mediaUrl && mediaUrl.trim() !== '') {
+            testUrl(mediaUrl, 
+                function() {
+                    // URL is accessible
+                },
+                function() {
+                    // URL returned error - mark as failed after timeout
+                    setTimeout(function() {
+                        if (!resolved) {
                             markAsFailed();
                         }
-                    } else {
-                        // Still loading after timeout, consider failed
-                        markAsFailed();
-                    }
+                    }, 1000);
                 }
-            }, 5000); // 5 second timeout
+            );
+        } else {
+            // No URL at all - mark as failed
+            setTimeout(function() {
+                if (!resolved) {
+                    markAsFailed();
+                }
+            }, 100);
+            return;
         }
+        
+        // Set up load/error listeners
+        element.addEventListener('load', function onLoad() {
+            // Wait a bit for rendering
+            setTimeout(function() {
+                markAsLoaded();
+            }, 100);
+            element.removeEventListener('load', onLoad);
+        }, { once: true });
+        
+        element.addEventListener('error', function onError() {
+            markAsFailed();
+            element.removeEventListener('error', onError);
+        }, { once: true });
+        
+        // For OBJECT elements, also listen for load event on contentDocument
+        if (isObject) {
+            // Additional check for object contentDocument
+            const checkObjectLoad = setInterval(function() {
+                if (isSvgLoaded(element)) {
+                    clearInterval(checkObjectLoad);
+                    markAsLoaded();
+                }
+            }, 100);
+            
+            // Clear interval after timeout
+            setTimeout(function() {
+                clearInterval(checkObjectLoad);
+            }, 5000);
+        }
+        
+        // Set timeout in case events don't fire
+        setTimeout(function() {
+            if (!resolved) {
+                if (isSvgLoaded(element)) {
+                    markAsLoaded();
+                } else {
+                    markAsFailed();
+                }
+            }
+        }, 5000);
     }
     
     function handleSvgElement(link) {
         if (processedLinks.has(link)) return;
         processedLinks.add(link);
         
-        const dataImage = link.getAttribute('data-image');
         const container = link.querySelector('.svg__object__container');
-        const svgObject = link.querySelector('.crash__svg__object');
-        const imgElement = link.querySelector('img'); // Check for img elements
-        const fallback = link.querySelector('.svg__fallback');
+        if (!container) return;
         
-        // Handle img element if present (priority)
+        // Check for object element first
+        const objectElement = container.querySelector('object.crash__svg__object');
+        const imgElement = container.querySelector('img.crash__svg__object');
+        
+        // Handle object element if present (priority for SVG)
+        if (objectElement) {
+            handleMediaElement(objectElement, link);
+            return;
+        }
+        
+        // Handle img element if present
         if (imgElement) {
-            handleImageElement(imgElement, link);
+            handleMediaElement(imgElement, link);
             return;
         }
         
-        // Original SVG handling code
-        if (!container || !svgObject) return;
-        
-        const svgDataUrl = svgObject.getAttribute('data');
-        
-        // If no data URL at all, show fallback immediately
-        if (!svgDataUrl || svgDataUrl.trim() === '') {
-            svgObject.style.opacity = '0';
-            svgObject.style.display = 'none';
-            if (fallback) {
-                fallback.style.display = 'flex';
-            }
-            link.classList.remove('casinoLink');
-            link.classList.add('casinoLinkremoved');
-            return;
+        // If no media element found, show fallback
+        const fallback = link.querySelector('.svg__fallback');
+        if (fallback) {
+            fallback.style.display = 'flex';
         }
-        
-        let resolved = false;
-        let checkInterval;
-        let maxTimeout;
-        let loadEventFired = false;
-        let errorEventFired = false;
-        
-        function markAsLoaded() {
-            if (resolved) return;
-            resolved = true;
-            
-            clearInterval(checkInterval);
-            clearTimeout(maxTimeout);
-            
-            // SVG loaded successfully
-            svgObject.style.opacity = '1';
-            svgObject.style.display = '';
-            container.style.backgroundImage = 'none';
-            if (fallback) {
-                fallback.style.display = 'none';
-            }
-        }
-        
-        function markAsFailed() {
-            if (resolved) return;
-            resolved = true;
-            
-            clearInterval(checkInterval);
-            clearTimeout(maxTimeout);
-            
-            // SVG failed to load - show fallback
-            svgObject.style.opacity = '0';
-            svgObject.style.display = 'none';
-            
-            if (fallback) {
-                fallback.style.display = 'flex';
-            }
-            link.classList.remove('casinoLink');
-            link.classList.add('casinoLinkremoved');
-        }
-        
-        // Setup background image (if available)
-        if (dataImage) {
-            const testImage = new Image();
-            testImage.onload = function () {
-                container.style.backgroundImage = 'url(' + dataImage + ')';
-                container.style.backgroundSize = 'contain';
-                container.style.backgroundPosition = 'center';
-                container.style.backgroundRepeat = 'no-repeat';
-            };
-            testImage.src = dataImage;
-        }
-        
-        // Check if already loaded
-        if (isSvgLoaded(svgObject)) {
-            markAsLoaded();
-            return;
-        }
-        
-        // Start hidden until we know the result
-        svgObject.style.opacity = '0';
-        
-        // Listen for successful load
-        svgObject.addEventListener('load', function onLoad() {
-            loadEventFired = true;
-            // Wait a bit for rendering
-            setTimeout(function() {
-                if (!errorEventFired) {
-                    // Load event fired - consider it successful
-                    // Even if we can't access contentDocument due to CORS
-                    markAsLoaded();
-                }
-            }, 100);
-            svgObject.removeEventListener('load', onLoad);
-        }, { once: true });
-        
-        // Listen for error
-        svgObject.addEventListener('error', function onError() {
-            errorEventFired = true;
-            markAsFailed();
-            svgObject.removeEventListener('error', onError);
-        }, { once: true });
-        
-        // Test the URL accessibility as backup
-        testSvgUrl(svgDataUrl, 
-            function() {
-                // URL is accessible - if load event doesn't fire, still consider checking
-            },
-            function() {
-                // URL returned error - mark as failed
-                if (!loadEventFired && !resolved) {
-                    setTimeout(function() {
-                        if (!loadEventFired && !resolved) {
-                            markAsFailed();
-                        }
-                    }, 1000);
-                }
-            }
-        );
-        
-        // Polling mechanism - check every 150ms
-        let checkCount = 0;
-        const maxChecks = 30; // 4.5 seconds total (30 * 150ms)
-        
-        checkInterval = setInterval(function() {
-            checkCount++;
-            
-            if (errorEventFired) {
-                // Already failed
-                return;
-            }
-            
-            if (loadEventFired || isSvgLoaded(svgObject)) {
-                // Successfully loaded
-                markAsLoaded();
-            } else if (checkCount >= maxChecks) {
-                // Timeout reached
-                // Check one more time if it has visual dimensions (CORS case)
-                if (svgObject.offsetWidth > 0 && svgObject.offsetHeight > 0) {
-                    // Has dimensions - likely loaded but CORS blocked access
-                    markAsLoaded();
-                } else {
-                    // No dimensions - failed
-                    markAsFailed();
-                }
-            }
-        }, 150);
-        
-        // Absolute maximum timeout (6 seconds)
-        maxTimeout = setTimeout(function() {
-            if (!resolved) {
-                // Final check
-                if (loadEventFired || isSvgLoaded(svgObject) || 
-                    (svgObject.offsetWidth > 0 && svgObject.offsetHeight > 0)) {
-                    markAsLoaded();
-                } else {
-                    markAsFailed();
-                }
-            }
-        }, 6000);
+        link.classList.remove('casinoLink');
+        link.classList.add('casinoLinkremoved');
     }
     
     function processAllLinks() {
-        // Process all casino links (for SVG)
+        // Process all casino links
         document.querySelectorAll('.casinoLink').forEach(handleSvgElement);
         
-        // Also process any img elements that might not be in .casinoLink containers
-        document.querySelectorAll('.svg__object__container img').forEach(function(img) {
-            if (!processedImages.has(img)) {
-                const link = img.closest('.casinoLink, .casinoLinkremoved');
-                handleImageElement(img, link);
+        // Also process any media elements that might not be in .casinoLink containers
+        document.querySelectorAll('.svg__object__container object, .svg__object__container img').forEach(function(element) {
+            if (!processedElements.has(element)) {
+                const link = element.closest('.casinoLink, .casinoLinkremoved');
+                handleMediaElement(element, link);
             }
         });
     }
@@ -439,9 +342,9 @@ var swiperMobile = new Swiper('.crash__games__mobile', {
     autoplay: {
         delay: 3000,
         disableOnInteraction: false,
-        pauseOnMouseEnter: false, // Changed to false - autoplay continues even on hover
+        pauseOnMouseEnter: false,
         waitForTransition: true,
-        stopOnLastSlide: false // Changed to false - continues even at last slide
+        stopOnLastSlide: false
     },
     pagination: {
         el: '.swiper-pagination',
@@ -490,9 +393,9 @@ var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
     autoplay: {
         delay: 3000,
         disableOnInteraction: false,
-        pauseOnMouseEnter: false, // Changed to false - autoplay continues even on hover
+        pauseOnMouseEnter: false,
         waitForTransition: true,
-        stopOnLastSlide: false // Changed to false - continues even at last slide
+        stopOnLastSlide: false 
     },
     speed: 500,
     pagination: {
@@ -529,9 +432,9 @@ var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
     autoplay: {
         delay: 3000,
         disableOnInteraction: false,
-        pauseOnMouseEnter: false, // Changed to false - autoplay continues even on hover
+        pauseOnMouseEnter: false,
         waitForTransition: true,
-        stopOnLastSlide: false // Changed to false - continues even at last slide
+        stopOnLastSlide: false
     },
     speed: 500,
     pagination: {
@@ -541,7 +444,6 @@ var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
     loop: true,
     on: {
         init: function() {
-            // Force start autoplay immediately
             if (this.autoplay && !this.autoplay.running) {
                 this.autoplay.start();
             }
@@ -562,57 +464,21 @@ document.addEventListener('DOMContentLoaded', function () {
         const observer = new MutationObserver(function (mutations) {
             mutations.forEach(function (mutation) {
                 mutation.removedNodes.forEach(function (node) {
-                    // Handle SVG object removal
-                    if (node.classList && node.classList.contains('crash__svg__object')) {
+                    // Handle OBJECT or IMG element removal
+                    if ((node.classList && node.classList.contains('crash__svg__object')) || 
+                        (node.tagName && (node.tagName.toLowerCase() === 'object' || node.tagName.toLowerCase() === 'img'))) {
+                        
                         const parentLink = mutation.target.closest('.casinoLink, .casinoLinkremoved');
                         const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
                         const fallback = mutation.target.querySelector('.svg__fallback');
-                        if (dataImage) {
+                        
+                        if (dataImage && mutation.target) {
                             const testImage = new Image();
                             testImage.onload = function () {
                                 mutation.target.style.backgroundImage = 'url(' + dataImage + ')';
                                 mutation.target.style.backgroundSize = 'contain';
                                 mutation.target.style.backgroundPosition = 'center';
                                 mutation.target.style.backgroundRepeat = 'no-repeat';
-                                if (fallback) {
-                                    fallback.style.display = 'none';
-                                }
-                            };
-                            testImage.onerror = function () {
-                                if (fallback) {
-                                    fallback.style.display = 'flex';
-                                }
-                                if (parentLink) {
-                                    parentLink.classList.remove('casinoLink');
-                                    parentLink.classList.add('casinoLinkremoved');
-                                }
-                            };
-                            testImage.src = dataImage;
-                        } else {
-                            if (fallback) {
-                                fallback.style.display = 'flex';
-                            }
-                            if (parentLink) {
-                                parentLink.classList.remove('casinoLink');
-                                parentLink.classList.add('casinoLinkremoved');
-                            }
-                        }
-                    }
-                    
-                    // Handle IMG element removal
-                    if (node.tagName && node.tagName.toLowerCase() === 'img') {
-                        const parentLink = node.closest('.casinoLink, .casinoLinkremoved');
-                        const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
-                        const container = node.parentElement;
-                        const fallback = container ? container.querySelector('.svg__fallback') : null;
-                        
-                        if (dataImage && container) {
-                            const testImage = new Image();
-                            testImage.onload = function () {
-                                container.style.backgroundImage = 'url(' + dataImage + ')';
-                                container.style.backgroundSize = 'contain';
-                                container.style.backgroundPosition = 'center';
-                                container.style.backgroundRepeat = 'no-repeat';
                                 if (fallback) {
                                     fallback.style.display = 'none';
                                 }
@@ -670,7 +536,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     
     // Periodically check and restart autoplay if it stops
-    setInterval(ensureAutoplayRunning, 10000); // Check every 10 seconds
+    setInterval(ensureAutoplayRunning, 10000);
     
     // Also check when page becomes visible
     document.addEventListener('visibilitychange', function() {
@@ -681,4 +547,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-console.log('Swiper autoplay ALWAYS enabledasas');
+console.log('Swiper autoplay ALWAYS enabled with OBJECT/IMG support');
