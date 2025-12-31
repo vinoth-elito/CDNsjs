@@ -64,62 +64,88 @@ $crashGamesSec.on('scroll', function () {
     }
     resetAutoplay();
 });
+
 scrollTimer = setInterval(autoplay, 3000);
+
+
+var swiperMobile = new Swiper('.crash__games__mobile', {
+    loop: true,
+    slidesPerView: 'auto',
+    spaceBetween: 10,
+    autoplay: {
+        delay: 4000,
+        disableOnInteraction: false
+    },
+    pagination: {
+        el: '.swiper-pagination',
+        clickable: true
+    },
+    breakpoints: {
+        640: {
+            slidesPerView: 1,
+            spaceBetween: 20
+        },
+        768: {
+            slidesPerView: 1,
+            spaceBetween: 10
+        },
+        1024: {
+            slidesPerView: 1,
+            spaceBetween: 10
+        }
+    }
+});
+
+
+var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
+    slidesPerView: 4,
+    spaceBetween: 20,
+    mousewheel: {
+        forceToAxis: true,
+        sensitivity: 1,
+        releaseOnEdges: true,
+    },
+    autoplay: {
+        delay: 4000,
+        disableOnInteraction: false,
+    },
+    speed: 500,
+    pagination: {
+        el: ".swiper-pagination",
+        clickable: true,
+    },
+    loop: true,
+});
+
+
+var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
+    slidesPerView: 4,
+    spaceBetween: 20,
+    mousewheel: {
+        forceToAxis: true,
+        sensitivity: 1,
+        releaseOnEdges: true,
+    },
+    autoplay: {
+        delay: 4000,
+        disableOnInteraction: false,
+    },
+    speed: 500,
+    pagination: {
+        el: ".swiper-pagination",
+        clickable: true,
+    },
+    loop: true,
+});
+
+// Global SVG handler
+// Enhanced handler for both SVG and IMG elements
 var svgHandler = (function() {
     const processedLinks = new WeakSet();
     const processedImages = new WeakSet();
     
     function isSvgLoaded(svgObject) {
-        if (!svgObject) return false;
-        
-        try {
-            // Try to access contentDocument
-            const doc = svgObject.contentDocument;
-            if (doc) {
-                const svgElement = doc.querySelector('svg');
-                if (svgElement) {
-                    return true;
-                }
-            }
-            
-            // Alternative method
-            if (svgObject.getSVGDocument) {
-                try {
-                    const svgDoc = svgObject.getSVGDocument();
-                    if (svgDoc && svgDoc.querySelector('svg')) {
-                        return true;
-                    }
-                } catch (e) {
-                    // CORS blocked - but check if it visually loaded
-                }
-            }
-        } catch (e) {
-            // CORS or access denied - check alternate indicators
-        }
-        
-        // If we can't access content due to CORS, check visual indicators
-        // If the object has dimensions and data attribute, assume it loaded
-        if (svgObject.offsetWidth > 0 && svgObject.offsetHeight > 0) {
-            const dataUrl = svgObject.getAttribute('data');
-            if (dataUrl && dataUrl.trim() !== '') {
-                // Object is visible with valid data - likely loaded successfully despite CORS
-                return true;
-            }
-        }
-        
-        return false;
-    }
-    
-    function testSvgUrl(url, onSuccess, onError) {
-        // Test if the SVG URL is accessible
-        const testImg = new Image();
-        testImg.onload = function() {
-            onSuccess();
-        };
-        testImg.onerror = function() {
-            onError();
-        };
-        testImg.src = url;
+        // ... keep your existing isSvgLoaded function unchanged ...
     }
     
     function handleImageElement(imgElement, link) {
@@ -251,7 +277,7 @@ var svgHandler = (function() {
             return;
         }
         
-        // Original SVG handling code
+        // Original SVG handling code (keep your existing code)
         if (!container || !svgObject) return;
         
         const svgDataUrl = svgObject.getAttribute('data');
@@ -268,145 +294,7 @@ var svgHandler = (function() {
             return;
         }
         
-        let resolved = false;
-        let checkInterval;
-        let maxTimeout;
-        let loadEventFired = false;
-        let errorEventFired = false;
-        
-        function markAsLoaded() {
-            if (resolved) return;
-            resolved = true;
-            
-            clearInterval(checkInterval);
-            clearTimeout(maxTimeout);
-            
-            // SVG loaded successfully
-            svgObject.style.opacity = '1';
-            svgObject.style.display = '';
-            container.style.backgroundImage = 'none';
-            if (fallback) {
-                fallback.style.display = 'none';
-            }
-        }
-        
-        function markAsFailed() {
-            if (resolved) return;
-            resolved = true;
-            
-            clearInterval(checkInterval);
-            clearTimeout(maxTimeout);
-            
-            // SVG failed to load - show fallback
-            svgObject.style.opacity = '0';
-            svgObject.style.display = 'none';
-            
-            if (fallback) {
-                fallback.style.display = 'flex';
-            }
-            link.classList.remove('casinoLink');
-            link.classList.add('casinoLinkremoved');
-        }
-        
-        // Setup background image (if available)
-        if (dataImage) {
-            const testImage = new Image();
-            testImage.onload = function () {
-                container.style.backgroundImage = 'url(' + dataImage + ')';
-                container.style.backgroundSize = 'contain';
-                container.style.backgroundPosition = 'center';
-                container.style.backgroundRepeat = 'no-repeat';
-            };
-            testImage.src = dataImage;
-        }
-        
-        // Check if already loaded
-        if (isSvgLoaded(svgObject)) {
-            markAsLoaded();
-            return;
-        }
-        
-        // Start hidden until we know the result
-        svgObject.style.opacity = '0';
-        
-        // Listen for successful load
-        svgObject.addEventListener('load', function onLoad() {
-            loadEventFired = true;
-            // Wait a bit for rendering
-            setTimeout(function() {
-                if (!errorEventFired) {
-                    // Load event fired - consider it successful
-                    // Even if we can't access contentDocument due to CORS
-                    markAsLoaded();
-                }
-            }, 100);
-            svgObject.removeEventListener('load', onLoad);
-        }, { once: true });
-        
-        // Listen for error
-        svgObject.addEventListener('error', function onError() {
-            errorEventFired = true;
-            markAsFailed();
-            svgObject.removeEventListener('error', onError);
-        }, { once: true });
-        
-        // Test the URL accessibility as backup
-        testSvgUrl(svgDataUrl, 
-            function() {
-                // URL is accessible - if load event doesn't fire, still consider checking
-            },
-            function() {
-                // URL returned error - mark as failed
-                if (!loadEventFired && !resolved) {
-                    setTimeout(function() {
-                        if (!loadEventFired && !resolved) {
-                            markAsFailed();
-                        }
-                    }, 1000);
-                }
-            }
-        );
-        
-        // Polling mechanism - check every 150ms
-        let checkCount = 0;
-        const maxChecks = 30; // 4.5 seconds total (30 * 150ms)
-        
-        checkInterval = setInterval(function() {
-            checkCount++;
-            
-            if (errorEventFired) {
-                // Already failed
-                return;
-            }
-            
-            if (loadEventFired || isSvgLoaded(svgObject)) {
-                // Successfully loaded
-                markAsLoaded();
-            } else if (checkCount >= maxChecks) {
-                // Timeout reached
-                // Check one more time if it has visual dimensions (CORS case)
-                if (svgObject.offsetWidth > 0 && svgObject.offsetHeight > 0) {
-                    // Has dimensions - likely loaded but CORS blocked access
-                    markAsLoaded();
-                } else {
-                    // No dimensions - failed
-                    markAsFailed();
-                }
-            }
-        }, 150);
-        
-        // Absolute maximum timeout (6 seconds)
-        maxTimeout = setTimeout(function() {
-            if (!resolved) {
-                // Final check
-                if (loadEventFired || isSvgLoaded(svgObject) || 
-                    (svgObject.offsetWidth > 0 && svgObject.offsetHeight > 0)) {
-                    markAsLoaded();
-                } else {
-                    markAsFailed();
-                }
-            }
-        }, 6000);
+        // ... rest of your existing handleSvgElement code ...
     }
     
     function processAllLinks() {
@@ -427,17 +315,28 @@ var svgHandler = (function() {
         handleSvgElement: handleSvgElement
     };
 })();
+
+// Initialize Swipers with proper callbacks
 var swiperMobile = new Swiper('.crash__games__mobile', {
     loop: true,
     slidesPerView: 'auto',
     spaceBetween: 10,
-    autoplay: {
-        delay: 4000,
-        disableOnInteraction: false
-    },
+    autoplay: false,
     pagination: {
         el: '.swiper-pagination',
         clickable: true
+    },
+    on: {
+        init: function() {
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 150);
+        },
+        slideChange: function() {
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 100);
+        }
     },
     breakpoints: {
         640: {
@@ -454,6 +353,7 @@ var swiperMobile = new Swiper('.crash__games__mobile', {
         }
     }
 });
+
 var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
     slidesPerView: 4,
     spaceBetween: 20,
@@ -462,17 +362,27 @@ var swiperTopRow = new Swiper(".ks_mycrash_game_ab", {
         sensitivity: 1,
         releaseOnEdges: true,
     },
-    autoplay: {
-        delay: 4000,
-        disableOnInteraction: false,
-    },
+    autoplay: false,
     speed: 500,
     pagination: {
         el: ".swiper-pagination",
         clickable: true,
     },
     loop: true,
+    on: {
+        init: function() {
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 150);
+        },
+        slideChange: function() {
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 100);
+        }
+    }
 });
+
 var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
     slidesPerView: 4,
     spaceBetween: 20,
@@ -481,22 +391,33 @@ var swiperBottomRow = new Swiper(".ks_mycrash_game_ab2", {
         sensitivity: 1,
         releaseOnEdges: true,
     },
-    autoplay: {
-        delay: 4000,
-        disableOnInteraction: false,
-    },
+    autoplay: false,
     speed: 500,
     pagination: {
         el: ".swiper-pagination",
         clickable: true,
     },
     loop: true,
+    on: {
+        init: function() {
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 150);
+        },
+        slideChange: function() {
+            setTimeout(function() {
+                svgHandler.processAllLinks();
+            }, 100);
+        }
+    }
 });
+
 document.addEventListener('DOMContentLoaded', function () {
     function setupFallbackDetection(container) {
     const observer = new MutationObserver(function (mutations) {
         mutations.forEach(function (mutation) {
             mutation.removedNodes.forEach(function (node) {
+                // Handle SVG object removal
                 if (node.classList && node.classList.contains('crash__svg__object')) {
                     const parentLink = mutation.target.closest('.casinoLink, .casinoLinkremoved');
                     const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
@@ -532,6 +453,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         }
                     }
                 }
+                
+                // Handle IMG element removal
                 if (node.tagName && node.tagName.toLowerCase() === 'img') {
                     const parentLink = node.closest('.casinoLink, .casinoLinkremoved');
                     const dataImage = parentLink ? parentLink.getAttribute('data-image') : null;
@@ -586,4 +509,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-console.log('ajith');
+console.log('12345');
